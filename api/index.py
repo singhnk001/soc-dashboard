@@ -38,6 +38,16 @@ def init_db():
 
     cursor.executescript("""
         -- Logs table: stores all ingested security events
+
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL,
+            real_name TEXT DEFAULT '',
+            status TEXT DEFAULT 'Active'
+        );
+
         CREATE TABLE IF NOT EXISTS logs (
             id          TEXT PRIMARY KEY,
             timestamp   TEXT NOT NULL,
@@ -878,3 +888,92 @@ def purge_old_logs(days: int = Query(30, ge=1)):
     conn.commit()
     conn.close()
     return {"status": "purged", "deleted": deleted, "retention_days": days}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, role, status, real_name FROM users WHERE username COLLATE NOCASE = ? AND password = ?", (req.username, req.password))
+    user = cursor.fetchone()
+    conn.close()
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user[2] != 'Active':
+        raise HTTPException(status_code=403, detail="Account disabled")
+    return {"username": user[0], "role": user[1], "status": user[2], "real_name": user[3] or user[0]}
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str
+    real_name: str = ""
+
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = None
+    real_name: Optional[str] = None
+
+@app.get("/api/users")
+def get_users():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, role, status, real_name FROM users")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "username": r[1], "role": r[2], "status": r[3], "real_name": r[4] or r[1]} for r in rows]
+
+@app.post("/api/users")
+def create_user(user: UserCreate):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        user_id = str(uuid.uuid4())
+        cursor.execute("INSERT INTO users (id, username, password, role, real_name) VALUES (?, ?, ?, ?, ?)", 
+                      (user_id, user.username, user.password, user.role, user.real_name))
+        conn.commit()
+        return {"id": user_id, "username": user.username, "role": user.role, "status": "Active", "real_name": user.real_name}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    finally:
+        conn.close()
+
+@app.patch("/api/users/{user_id}")
+def update_user(user_id: str, user: UserUpdate):
+    conn = get_db()
+    cursor = conn.cursor()
+    updates = []
+    params = []
+    if user.password:
+        updates.append("password = ?")
+        params.append(user.password)
+    if user.role:
+        updates.append("role = ?")
+        params.append(user.role)
+    if user.status:
+        updates.append("status = ?")
+        params.append(user.status)
+    if user.real_name is not None:
+        updates.append("real_name = ?")
+        params.append(user.real_name)
+        
+    if updates:
+        params.append(user_id)
+        cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
+        conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}

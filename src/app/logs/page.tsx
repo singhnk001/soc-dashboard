@@ -29,9 +29,11 @@ export default function LogsPage() {
         {isLoading ? (
           <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-blue-500" size={32} /></div>
         ) : error ? (
-          <div className="text-red-500 flex justify-center items-center h-full">Failed to load logs. Ensure FastAPI is running on port 8000.</div>
+          <div className="text-red-500 flex justify-center items-center h-full">Failed to load logs. Ensure backend is running and database is accessible.</div>
         ) : (
-          <LogTable logs={data?.data || []} />
+          <React.Suspense fallback={<div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}>
+            <LogTable logs={data?.data || []} />
+          </React.Suspense>
         )}
       </div>
     </div>

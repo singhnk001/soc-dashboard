@@ -2,13 +2,21 @@
 
 import { Search, Bell, User, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, KeyboardEvent } from 'react';
+import useSWR from 'swr';
+import Link from 'next/link';
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  const { data: alerts } = useSWR('/api/alerts', fetcher, { refreshInterval: 10000 });
+  const newAlertsCount = alerts?.items?.filter((a: any) => a.status === 'new').length || 0;
   const [currentTime, setCurrentTime] = useState<string>('');
   const [role, setRole] = useState<string>('');
+  
 
   useEffect(() => {
     const updateTime = () => {
@@ -21,15 +29,15 @@ export default function Header() {
     
     // Simple cookie parser for session
     const getCookie = (name: string) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift();
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      if (match) return decodeURIComponent(match[2]);
       return null;
     };
-    setRole(getCookie('soc_session') || 'admin');
+    setRole(localStorage.getItem('soc_role') || 'ERROR_PLEASE_HARD_REFRESH_LOGIN_PAGE');
+    
 
     return () => clearInterval(interval);
-  }, []);
+  }, [pathname]);
 
   const getPageTitle = () => {
     if (pathname === '/') return 'Dashboard';
@@ -39,6 +47,9 @@ export default function Header() {
 
   const handleLogout = () => {
     document.cookie = 'soc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    localStorage.removeItem('soc_user');
+    localStorage.removeItem('soc_real_name');
+    localStorage.removeItem('soc_role');
     router.push('/login');
   };
 
@@ -54,6 +65,13 @@ export default function Header() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             type="text" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchQuery.trim()) {
+                router.push(`/logs?search=${encodeURIComponent(searchQuery.trim())}`);
+              }
+            }}
             placeholder="Search logs, alerts, hosts..." 
             className="pl-10 pr-4 py-2 bg-[#11141e] border border-gray-700 rounded-md text-sm text-white focus:outline-none focus:border-blue-500 w-64 transition-colors"
           />
@@ -63,16 +81,20 @@ export default function Header() {
           {currentTime}
         </div>
 
-        <button className="relative text-gray-400 hover:text-white transition-colors">
+        <Link href="/alerts" className="relative text-gray-400 hover:text-white transition-colors">
           <Bell size={20} />
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
-            3
-          </span>
-        </button>
+          {newAlertsCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+              {newAlertsCount}
+            </span>
+          )}
+        </Link>
 
         <div className="flex items-center gap-3 border-l border-gray-800 pl-6">
           <div className="flex flex-col items-end hidden sm:flex">
-            <span className="text-sm font-medium text-white capitalize">{role} User</span>
+            <span className="text-sm font-medium text-white">
+              {role === 'admin' ? 'Administrator' : role === 'l3' ? 'L3 Analyst' : role === 'l2' ? 'L2 Analyst' : role === 'l1' ? 'L1 Analyst' : role === 'readonly' ? 'Read Only' : role}
+            </span>
             <span className="text-[10px] text-blue-400 font-mono uppercase bg-blue-500/10 px-1.5 rounded">{role} Access</span>
           </div>
           <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 cursor-pointer">

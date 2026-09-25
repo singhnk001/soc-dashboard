@@ -4,24 +4,32 @@ import { Shield, KeyRound, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [userId, setUserId] = useState('admin');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (userId === 'admin' && password === 'Password@123') {
-      document.cookie = 'soc_session=admin; path=/';
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userId, password })
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        setError(errorData.detail || 'Invalid credentials');
+        return;
+      }
+      
+      const data = await res.json();
+      document.cookie = `soc_session=${data.role}; path=/; max-age=86400`;
+      localStorage.setItem('soc_role', data.role);
       router.push('/');
-    } else if (userId === 'readonly' && password === 'readonly123') {
-      document.cookie = 'soc_session=readonly; path=/';
-      router.push('/');
-    } else if (userId === 'l1' && password === 'l1pass') {
-      document.cookie = 'soc_session=l1; path=/';
-      router.push('/');
-    } else {
-      setError('Invalid credentials. Hint: admin/Password@123 or readonly/readonly123');
+    } catch (err) {
+      setError('Connection to auth server failed');
     }
   };
 
