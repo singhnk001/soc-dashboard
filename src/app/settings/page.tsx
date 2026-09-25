@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import React, { useState, useEffect } from 'react';
-import useSWR, { mutate } from 'swr';
-import { Save, Bell, Shield, Database, Globe, Clock, Monitor, ToggleLeft, ToggleRight, Lock, Users, UserPlus, Trash2 } from 'lucide-react';
+import useSWR from 'swr';
+import { Save, Shield, Monitor, ToggleLeft, ToggleRight, Users, UserPlus, Trash2, Key, CheckCircle, AlertCircle } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface SettingToggleProps {
   label: string;
@@ -32,307 +33,224 @@ function SettingToggle({ label, description, enabled, onToggle, disabled }: Sett
 
 export default function SettingsPage() {
   const fetcher = (url: string) => fetch(url).then(res => res.json());
-  const { data: users, isLoading: usersLoading } = useSWR('/api/users', fetcher);
+  const { data: usersData } = useSWR('/api/users', fetcher);
+  const users = usersData?.data || usersData || [];
   
-  const [role, setRole] = useState<string>('admin');
+  const [activeTab, setActiveTab] = useState('security');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // MFA State
+  const [mfaSetup, setMfaSetup] = useState<any>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaError, setMfaError] = useState('');
+  const [mfaSuccess, setMfaSuccess] = useState(false);
   
   useEffect(() => {
-    const getCookie = (name: string) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift();
-      return 'admin';
-    };
-    setRole(getCookie('soc_session') || 'admin');
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        setCurrentUser(JSON.parse(userStr));
+      }
+    } catch(e) {}
   }, []);
   
-  const canEdit = role === 'admin' || role === 'l3';
-
-  const [sessionTimeout, setSessionTimeout] = useState('90');
-  useEffect(() => setSessionTimeout(localStorage.getItem('soc_idle_timeout') || '90'), []);
-  const [smtpConfig, setSmtpConfig] = useState({ host: 'smtp.sendgrid.net', port: '587', user: 'apikey', pass: '' });
-  const [slackWebhook, setSlackWebhook] = useState('');
-  const [settings, setSettings] = useState({
-    realTimeAlerts: true,
-    emailNotifications: false,
-    slackIntegration: true,
-    autoCorrelation: true,
-    darkMode: true,
-    logRetention: '30',
-    apiUrl: '/api',
-    refreshInterval: '30',
-    maxLogEntries: '10000',
-    severityThreshold: 'medium',
-  });
-
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [isAddingUser, setIsAddingUser] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'l1', real_name: '' });
-  
-  const handleDeleteUser = async (id: string) => {
-    if (!window.confirm('Delete user?')) return;
-    await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    mutate('/api/users');
+  const handleEnableMFA = async () => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch('/api/auth/mfa/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setMfaSetup(data);
+        setMfaError('');
+        setMfaSuccess(false);
+      }
+    } catch(e) {
+      console.error(e);
+    }
   };
 
-  
-  const saveNewUser = async () => {
-    if (!newUser.username || !newUser.password) return alert('Username and password required');
-    const res = await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newUser)
-    });
-    if (!res.ok) return alert('Failed to create user (username might exist)');
-    setIsAddingUser(false);
-    setNewUser({ username: '', password: '', role: 'l1', real_name: '' });
-    mutate('/api/users');
-  };
-
-  const saveUserEdit = async () => {
-    await fetch(`/api/users/${editingUser.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: editingUser.role, status: editingUser.status, real_name: editingUser.real_name })
-    });
-    setEditingUser(null);
-    mutate('/api/users');
-  };
-
-  const toggle = (key: keyof typeof settings) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleVerifyMFA = async () => {
+    if (!mfaCode || mfaCode.length < 6) return;
+    try {
+      const res = await fetch('/api/auth/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id, secret: mfaSetup.secret, code: mfaCode })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        setMfaSuccess(true);
+        setMfaError('');
+        // Update local user object
+        const updatedUser = { ...currentUser, mfa_enabled: true };
+        setCurrentUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      } else {
+        setMfaError(data.detail || 'Verification failed. Try again.');
+      }
+    } catch(e) {
+      setMfaError('Error verifying code.');
+    }
   };
 
   return (
-    <div className="p-6 space-y-6 bg-[#0f1219] min-h-screen text-white relative">
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-gray-400 text-sm mt-1">Configure your SOC Dashboard preferences</p>
+    <div className="p-8 max-w-5xl mx-auto space-y-6">
+      <div className="flex justify-between items-end mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">Platform Settings</h1>
+          <p className="text-gray-400">Manage security, users, and system preferences</p>
+        </div>
+      </div>
+      
+      <div className="flex border-b border-gray-800 mb-6 gap-6">
+        <button 
+          onClick={() => setActiveTab('security')} 
+          className={`pb-3 font-medium transition-colors ${activeTab === 'security' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400 hover:text-gray-300'}`}
+        >
+          <div className="flex items-center gap-2"><Key size={16}/> Account Security</div>
+        </button>
+        <button 
+          onClick={() => setActiveTab('users')} 
+          className={`pb-3 font-medium transition-colors ${activeTab === 'users' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400 hover:text-gray-300'}`}
+        >
+          <div className="flex items-center gap-2"><Users size={16}/> User Management</div>
+        </button>
+        <button 
+          onClick={() => setActiveTab('system')} 
+          className={`pb-3 font-medium transition-colors ${activeTab === 'system' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400 hover:text-gray-300'}`}
+        >
+          <div className="flex items-center gap-2"><Monitor size={16}/> System Preferences</div>
+        </button>
       </div>
 
-      {/* Notifications */}
-      <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Bell size={20} className="text-blue-500" />
-          <h3 className="text-lg font-semibold">Notifications</h3>
-        </div>
-        <SettingToggle
-          label="Real-time Alert Notifications"
-          description="Show browser notifications for new critical and high severity alerts"
-          enabled={settings.realTimeAlerts as boolean}
-          onToggle={() => { toggle('realTimeAlerts'); if (!settings.realTimeAlerts && 'Notification' in window) Notification.requestPermission(); }}
-          disabled={!canEdit}
-        />
-        <SettingToggle
-          label="Email Notifications"
-          description="Send email digests for unresolved critical alerts via SMTP"
-          enabled={settings.emailNotifications as boolean}
-          onToggle={() => toggle('emailNotifications')}
-          disabled={!canEdit}
-        />
-        {settings.emailNotifications && (
-          <div className="p-4 bg-[#11141e] rounded border border-gray-800 mt-2 space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">SMTP Host</label>
-                <input type="text" disabled={!canEdit} value={smtpConfig.host} onChange={e => setSmtpConfig({...smtpConfig, host: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="smtp.gmail.com" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Port</label>
-                <input type="text" disabled={!canEdit} value={smtpConfig.port} onChange={e => setSmtpConfig({...smtpConfig, port: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="587" />
-              </div>
+      {activeTab === 'security' && (
+        <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 animate-in fade-in duration-300">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="p-3 bg-indigo-500/10 rounded-lg">
+              <Shield className="w-6 h-6 text-indigo-400" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Username</label>
-                <input type="text" disabled={!canEdit} value={smtpConfig.user} onChange={e => setSmtpConfig({...smtpConfig, user: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="user@domain.com" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Password / App Password</label>
-                <input type="password" disabled={!canEdit} value={smtpConfig.pass} onChange={e => setSmtpConfig({...smtpConfig, pass: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="********" />
-              </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-white mb-1">Two-Factor Authentication (2FA)</h3>
+              <p className="text-gray-400 text-sm">Add an extra layer of security to your account. When logging in, you'll need to enter a unique 6-digit code generated by your Authenticator app (like Google Authenticator or Authy).</p>
             </div>
-            <button disabled={!canEdit} onClick={() => alert('SMTP Connection Successful! (Simulated)')} className="mt-2 text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded">Test Connection</button>
           </div>
-        )}
-        
-        <SettingToggle
-          label="Slack Integration"
-          description="Post alerts to configured Slack channels via Webhook"
-          enabled={settings.slackIntegration as boolean}
-          onToggle={() => toggle('slackIntegration')}
-          disabled={!canEdit}
-        />
-        {settings.slackIntegration && (
-          <div className="p-4 bg-[#11141e] rounded border border-gray-800 mt-2">
-            <label className="block text-xs text-gray-400 mb-1">Slack Webhook URL</label>
-            <input type="password" disabled={!canEdit} value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="https://hooks.slack.com/services/your-workspace/your-channel/your-token" />
-            <button disabled={!canEdit} onClick={() => alert('Test message sent to Slack! (Simulated)')} className="mt-3 text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded">Test Webhook</button>
+
+          <div className="mt-8 pt-8 border-t border-gray-800">
+            {mfaSuccess ? (
+              <div className="flex flex-col items-center justify-center p-8 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                <CheckCircle className="w-16 h-16 text-emerald-500 mb-4" />
+                <h4 className="text-xl font-bold text-emerald-400 mb-2">2FA is Successfully Enabled!</h4>
+                <p className="text-gray-400 text-center">Your account is now secured with Time-Based One-Time Passwords (TOTP). You will be prompted for a code next time you log in.</p>
+              </div>
+            ) : !mfaSetup ? (
+              <button 
+                onClick={handleEnableMFA}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg shadow-indigo-900/20 transition-colors"
+              >
+                Set up 2FA via Authenticator App
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 gap-12">
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="font-bold text-white mb-2 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-sm">1</span> 
+                      Scan the QR Code
+                    </h4>
+                    <p className="text-gray-400 text-sm mb-4">Open your preferred Authenticator app (e.g. Google Authenticator, Authy, Aegis) and scan this QR code.</p>
+                    <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
+                      <QRCodeSVG value={mfaSetup.uri} size={180} level="M" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm mb-2">Can't scan the QR code? Enter this secret manually:</p>
+                    <div className="flex items-center gap-2 bg-[#0a0e1a] border border-gray-700 p-3 rounded-lg font-mono text-indigo-400 tracking-widest">
+                      {mfaSetup.secret}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="font-bold text-white mb-2 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-sm">2</span> 
+                      Verify & Enable
+                    </h4>
+                    <p className="text-gray-400 text-sm mb-4">Enter the 6-digit code generated by your app to confirm the setup.</p>
+                    
+                    {mfaError && (
+                      <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
+                        <p className="text-sm text-red-400">{mfaError}</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-4">
+                      <input 
+                        type="text" 
+                        maxLength={6}
+                        placeholder="000000"
+                        value={mfaCode}
+                        onChange={e => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                        className="w-48 bg-[#0a0e1a] border border-gray-700 rounded-lg p-3 text-center tracking-[0.5em] font-mono text-xl text-white focus:border-indigo-500 focus:outline-none"
+                      />
+                      <button 
+                        onClick={handleVerifyMFA}
+                        disabled={mfaCode.length < 6}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50 transition-colors"
+                      >
+                        Verify Code
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Detection Engine */}
-      <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Shield size={20} className="text-red-500" />
-          <h3 className="text-lg font-semibold">Detection Engine</h3>
-        </div>
-        <SettingToggle
-          label="Auto-Correlation"
-          description="Automatically correlate events across multiple log sources using MITRE ATT&CK mapping"
-          enabled={settings.autoCorrelation as boolean}
-          onToggle={() => toggle('autoCorrelation')}
-          disabled={!canEdit}
-        />
-        <div className="py-4 border-b border-gray-800">
-          <label className="block text-sm font-medium text-white mb-1">Minimum Severity Threshold</label>
-          <p className="text-gray-500 text-xs mb-2">Only generate alerts at or above this severity level</p>
-          <select
-            disabled={!canEdit}
-            value={settings.severityThreshold}
-            onChange={e => setSettings(prev => ({ ...prev, severityThreshold: e.target.value }))}
-            className="bg-[#0f1219] border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-48"
-          >
-            <option value="info">Info</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Data Sources */}
-      <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Database size={20} className="text-green-500" />
-          <h3 className="text-lg font-semibold">Data Sources</h3>
-        </div>
-        <div className="py-4 border-b border-gray-800">
-          <label className="block text-sm font-medium text-white mb-1">API Endpoint URL</label>
-          <p className="text-gray-500 text-xs mb-2">Backend API URL for log ingestion and retrieval</p>
-          <input
-            disabled={!canEdit}
-            type="text"
-            value={settings.apiUrl}
-            onChange={e => setSettings(prev => ({ ...prev, apiUrl: e.target.value }))}
-            className="bg-[#0f1219] border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-full max-w-md font-mono"
-          />
-        </div>
-        <div className="py-4 border-b border-gray-800">
-          <label className="block text-sm font-medium text-white mb-1">Log Retention Period (days)</label>
-          <p className="text-gray-500 text-xs mb-2">How long to retain log data before automatic cleanup</p>
-          <input
-            disabled={!canEdit}
-            type="number"
-            value={settings.logRetention}
-            onChange={e => setSettings(prev => ({ ...prev, logRetention: e.target.value }))}
-            className="bg-[#0f1219] border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-32"
-          />
-        </div>
-        <div className="py-4 border-b border-gray-800">
-          <label className="block text-sm font-medium text-white mb-1">Max Log Entries</label>
-          <p className="text-gray-500 text-xs mb-2">Maximum number of log entries to display in the viewer</p>
-          <input
-            disabled={!canEdit}
-            type="number"
-            value={settings.maxLogEntries}
-            onChange={e => setSettings(prev => ({ ...prev, maxLogEntries: e.target.value }))}
-            className="bg-[#0f1219] border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-32"
-          />
-        </div>
-      </div>
-
-      {/* Display */}
-      <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Monitor size={20} className="text-yellow-500" />
-          <h3 className="text-lg font-semibold">Display</h3>
-        </div>
-        <SettingToggle
-          label="Dark Mode"
-          description="Use dark theme (recommended for SOC environments)"
-          enabled={settings.darkMode as boolean}
-          onToggle={() => toggle('darkMode')}
-          disabled={!canEdit}
-        />
-        
-        <div className="py-4 border-b border-gray-800">
-          <label className="block text-sm font-medium text-white mb-1">Idle Session Timeout (seconds)</label>
-          <p className="text-gray-500 text-xs mb-2">Automatically sign out if idle for this duration</p>
-          <select
-            disabled={!canEdit}
-            value={sessionTimeout}
-            onChange={e => {
-              setSessionTimeout(e.target.value);
-              localStorage.setItem('soc_idle_timeout', e.target.value);
-              window.dispatchEvent(new Event('idle_timeout_change'));
-            }}
-            className="bg-[#0f1219] border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-48 mb-4"
-          >
-            <option value="30">30 seconds</option>
-            <option value="60">1 minute</option>
-            <option value="90">1 minute 30 seconds</option>
-            <option value="300">5 minutes</option>
-            <option value="600">10 minutes</option>
-          </select>
-        </div>
-
-        <div className="py-4 border-b border-gray-800">
-          <label className="block text-sm font-medium text-white mb-1">Auto-Refresh Interval (seconds)</label>
-          <p className="text-gray-500 text-xs mb-2">How often to refresh dashboard data</p>
-          <select
-            disabled={!canEdit}
-            value={settings.refreshInterval}
-            onChange={e => setSettings(prev => ({ ...prev, refreshInterval: e.target.value }))}
-            className="bg-[#0f1219] border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-48"
-          >
-            <option value="10">10 seconds</option>
-            <option value="30">30 seconds</option>
-            <option value="60">1 minute</option>
-          </select>
-        </div>
-      </div>
-
-      {/* User Management */}
-      {canEdit && (
-        <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Users size={20} className="text-purple-500" />
-            <h3 className="text-lg font-semibold">User Management & RBAC</h3>
+      {activeTab === 'users' && (
+        <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 animate-in fade-in duration-300">
+          <div className="flex items-center gap-3 mb-6">
+            <Users size={24} className="text-purple-500" />
+            <h3 className="text-lg font-bold text-white">User Management & RBAC</h3>
           </div>
-          <p className="text-gray-400 text-sm mb-4">Manage portal access, user credentials, and assign role-based privileges.</p>
+          <p className="text-gray-400 text-sm mb-8">Manage portal access, user credentials, and assign role-based privileges.</p>
           
-          <div className="overflow-x-auto mb-4">
+          <div className="overflow-x-auto mb-6">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[#0f1219] text-gray-400">
+              <thead className="bg-[#0f1219] text-gray-400 border-b border-gray-800">
                 <tr>
-                  <th className="p-3 font-medium rounded-tl-lg">User ID</th>
-                  <th className="p-3 font-medium">Full Name</th>
-                  <th className="p-3 font-medium">Role</th>
-                  <th className="p-3 font-medium">Status</th>
-                  <th className="p-3 font-medium rounded-tr-lg">Actions</th>
+                  <th className="p-4 font-semibold">User ID</th>
+                  <th className="p-4 font-semibold">Full Name</th>
+                  <th className="p-4 font-semibold">Role</th>
+                  <th className="p-4 font-semibold">Status</th>
+                  <th className="p-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-gray-800/50">
                 {users?.map((u: any) => (
-                  <tr key={u.id}>
-                    <td className="p-3 text-white font-medium">{u.username}</td>
-                    <td className="p-3 text-gray-300">{u.real_name || '-'}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-1 rounded text-xs ${u.role === 'admin' ? 'bg-red-500/10 text-red-400' : u.role === 'l1' ? 'bg-blue-500/10 text-blue-400' : 'bg-gray-500/10 text-gray-400'}`}>
+                  <tr key={u.id} className="hover:bg-[#11141e] transition-colors">
+                    <td className="p-4 text-white font-medium">{u.username}</td>
+                    <td className="p-4 text-gray-300">{u.real_name || '-'}</td>
+                    <td className="p-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${u.role === 'admin' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : u.role === 'l1' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'}`}>
                         {u.role.toUpperCase()}
                       </span>
                     </td>
-                    <td className="p-3">
-                      <span className={u.status === 'Active' ? 'text-green-400 text-xs' : 'text-red-400 text-xs'}>{u.status}</span>
+                    <td className="p-4">
+                      <span className={u.status === 'Active' ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'}>{u.status}</span>
                     </td>
-                    <td className="p-3">
-                      <div className="flex gap-3">
-                        <button className="text-gray-500 hover:text-white transition-colors" onClick={() => setEditingUser(u)}>Edit</button>
+                    <td className="p-4 text-right">
+                      <div className="flex gap-3 justify-end">
+                        <button className="text-gray-500 hover:text-white transition-colors">Edit</button>
                         {u.username !== 'admin' && (
-                          <button onClick={() => handleDeleteUser(u.id)} className="text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
+                          <button className="text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
                         )}
                       </div>
                     </td>
@@ -342,97 +260,18 @@ export default function SettingsPage() {
             </table>
           </div>
           
-          <button onClick={() => setIsAddingUser(true)} className="flex items-center gap-2 bg-[#0f1219] hover:bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-md transition-colors text-sm">
-            <UserPlus size={16} /> Add New User
+          <button className="flex items-center gap-2 bg-[#11141e] hover:bg-gray-800 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium">
+            <UserPlus size={18} /> Provision New User
           </button>
         </div>
       )}
 
-      {/* Save Button */}
-      <div className="flex justify-between items-center bg-[#1a1f2e] border border-gray-800 p-4 rounded-lg">
-        <div className="text-sm text-gray-400 flex items-center gap-2">
-          {!canEdit && <><Lock size={16} className="text-red-400" /> Settings are locked. Only Admin and L3 users can modify system configuration.</>}
-        </div>
-        <button 
-          disabled={!canEdit}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-md transition-colors font-medium text-sm ${canEdit ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
-        >
-          <Save size={16} />
-          Save Settings
-        </button>
-      </div>
-
-      
-      {isAddingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-6 w-96 relative">
-            <h3 className="text-lg font-bold mb-4">Add New User</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Username</label>
-                <input type="text" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Password</label>
-                <input type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Full Name</label>
-                <input type="text" value={newUser.real_name} onChange={e => setNewUser({...newUser, real_name: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white" />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Role</label>
-                <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white">
-                  <option value="admin">Admin</option>
-                  <option value="l3">L3 Analyst</option>
-                  <option value="l2">L2 Analyst</option>
-                  <option value="l1">L1 Analyst</option>
-                  <option value="readonly">Read-Only</option>
-                </select>
-              </div>
-              <div className="flex gap-2 justify-end mt-6">
-                <button onClick={() => setIsAddingUser(false)} className="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
-                <button onClick={saveNewUser} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded">Create User</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-6 w-96 relative">
-            <h3 className="text-lg font-bold mb-4">Edit User: {editingUser.username}</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Full Name</label>
-                <input type="text" value={editingUser.real_name || ''} onChange={e => setEditingUser({...editingUser, real_name: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Role</label>
-                <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white">
-                  <option value="admin">Admin</option>
-                  <option value="l3">L3 Analyst</option>
-                  <option value="l2">L2 Analyst</option>
-                  <option value="l1">L1 Analyst</option>
-                  <option value="readonly">Read-Only</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Status</label>
-                <select value={editingUser.status} onChange={e => setEditingUser({...editingUser, status: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white">
-                  <option value="Active">Active</option>
-                  <option value="Disabled">Disabled</option>
-                </select>
-              </div>
-              <div className="flex gap-2 justify-end mt-6">
-                <button onClick={() => setEditingUser(null)} className="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
-                <button onClick={saveUserEdit} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded">Save</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {activeTab === 'system' && (
+         <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 animate-in fade-in duration-300">
+             <h3 className="text-lg font-bold text-white mb-6">System Preferences</h3>
+             <SettingToggle label="Enable Email Notifications" description="Send critical alerts to SOC distribution lists." enabled={false} onToggle={()=>{}} />
+             <SettingToggle label="Dark Mode Enforcement" description="Force dark mode for all analysts globally." enabled={true} onToggle={()=>{}} />
+         </div>
       )}
     </div>
   );
