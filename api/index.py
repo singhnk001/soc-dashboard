@@ -271,7 +271,7 @@ def _seed_mitre_mappings(cursor: sqlite3.Cursor):
     ]
 
     cursor.executemany(
-        "INSERT INTO mitre_mappings (event_id, title, description, tactic, tactic_id, technique, technique_id, severity, platform) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO mitre_mappings (event_id, title, description, tactic, tactic_id, technique, technique_id, severity, platform) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         mappings
     )
 
