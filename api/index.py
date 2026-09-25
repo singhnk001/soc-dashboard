@@ -21,7 +21,7 @@ import os
 # ---------------------------------------------------------------------------
 
 # Use /tmp for Vercel serverless (ephemeral), or local path for persistent storage
-DB_PATH = os.environ.get("SOC_DB_PATH", os.path.join(os.path.dirname(__file__), "..", "soc_dashboard.db"))
+DB_PATH = os.environ.get("SOC_DB_PATH", "/tmp/soc_dashboard.db" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "soc_dashboard.db"))
 
 def get_db() -> sqlite3.Connection:
     """Get a database connection with row factory for dict-like access."""
