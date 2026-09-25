@@ -39,6 +39,7 @@ export interface Alert {
   resolution_type?: string;
   notes?: string;
   raw_log?: string;
+  extracted_fields?: string;
 }
 
 export interface DashboardStats {

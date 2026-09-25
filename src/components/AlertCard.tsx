@@ -92,21 +92,53 @@ export default function AlertCard({ alert }: AlertCardProps) {
            </div>
         )}
 
-        {/* Raw Log Details */}
-        {alert.raw_log && (
+        {/* Raw Log Details & Extracted Fields */}
+        {(alert.raw_log || alert.extracted_fields) && (
           <div className="mb-4">
             <details className="group">
-              <summary className="text-xs font-medium text-gray-400 cursor-pointer hover:text-gray-300 select-none">
-                View Raw Log Details
+              <summary className="text-xs font-medium text-blue-400/80 hover:text-blue-400 cursor-pointer select-none flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Investigation Evidence Data
               </summary>
-              <div className="mt-2 p-3 bg-[#11141e] border border-gray-800 rounded text-xs font-mono text-green-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
-                {(() => {
-                  try {
-                    return JSON.stringify(JSON.parse(alert.raw_log), null, 2);
-                  } catch (e) {
-                    return alert.raw_log;
-                  }
-                })()}
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {alert.extracted_fields && (
+                  <div>
+                    <div className="text-gray-400 mb-1 font-medium text-[10px] uppercase tracking-wider">Extracted Key-Value Pairs</div>
+                    <div className="bg-[#11141e] border border-gray-800 rounded p-0 overflow-hidden">
+                      <table className="w-full text-xs text-left">
+                        <tbody className="divide-y divide-gray-800/50">
+                          {(() => {
+                            try {
+                              const parsed = JSON.parse(alert.extracted_fields);
+                              return Object.entries(parsed).map(([k, v], i) => (
+                                <tr key={i} className="hover:bg-gray-800/50">
+                                  <td className="px-3 py-1.5 text-blue-400/80 font-mono align-top w-1/3">{k}</td>
+                                  <td className="px-3 py-1.5 text-gray-300 font-mono break-all">{String(v)}</td>
+                                </tr>
+                              ));
+                            } catch(e) { return null; }
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {alert.raw_log && (
+                  <div>
+                    <div className="text-gray-400 mb-1 font-medium text-[10px] uppercase tracking-wider">Raw Payload</div>
+                    <div className="p-3 bg-[#11141e] border border-gray-800 rounded text-xs font-mono text-green-400/80 overflow-x-auto whitespace-pre-wrap h-full max-h-48 overflow-y-auto shadow-inner">
+                      {(() => {
+                        try {
+                          return JSON.stringify(JSON.parse(alert.raw_log), null, 2);
+                        } catch (e) {
+                          return alert.raw_log;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
             </details>
           </div>
