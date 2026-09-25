@@ -182,47 +182,87 @@ def init_db():
     conn.close()
 
 def _seed_sample_data(cursor):
-    """Seed sample logs and alerts for Vercel deployment visualization."""
+    """Seed comprehensive 100+ sample logs and alerts for Vercel deployment visualization."""
     import uuid
+    import random
+    import json
     from datetime import datetime, timedelta
     
-    # Check if logs already exist
     count = cursor.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
     if count > 0:
         return
         
     now = datetime.utcnow()
+    logs_data = []
     
-    # Sample Logs
-    logs_data = [
-        # id, timestamp, source, event_id, severity, message, hostname, username, raw_log
-        (str(uuid.uuid4()), (now - timedelta(minutes=5)).isoformat() + "Z", "Security", "4624", "info", "Successful Logon", "DC-01", "admin", "Logon Type: 3"),
-        (str(uuid.uuid4()), (now - timedelta(minutes=10)).isoformat() + "Z", "Security", "4625", "high", "Failed Logon - Bad Password", "WEB-SRV", "root", "Failure Reason: Unknown user name or bad password."),
-        (str(uuid.uuid4()), (now - timedelta(minutes=15)).isoformat() + "Z", "Security", "4625", "high", "Failed Logon - Bad Password", "WEB-SRV", "root", "Failure Reason: Unknown user name or bad password."),
-        (str(uuid.uuid4()), (now - timedelta(minutes=20)).isoformat() + "Z", "Security", "4625", "high", "Failed Logon - Bad Password", "WEB-SRV", "root", "Failure Reason: Unknown user name or bad password."),
-        (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "System", "7045", "high", "A new service was installed.", "DB-01", "SYSTEM", "Service Name: BackdoorSvc"),
-        (str(uuid.uuid4()), (now - timedelta(minutes=45)).isoformat() + "Z", "Security", "1102", "critical", "The audit log was cleared.", "DC-01", "Administrator", "The audit log was cleared by Administrator"),
-        (str(uuid.uuid4()), (now - timedelta(hours=1)).isoformat() + "Z", "Security", "4688", "info", "A new process has been created.", "WORKSTATION-A", "user1", "Process: cmd.exe"),
-        (str(uuid.uuid4()), (now - timedelta(hours=2)).isoformat() + "Z", "Application", "1000", "medium", "Application Error", "WEB-SRV", "-", "Faulting application name: nginx.exe"),
-        (str(uuid.uuid4()), (now - timedelta(hours=3)).isoformat() + "Z", "syslog", "None", "medium", "Failed password for invalid user admin from 192.168.1.50 port 54322 ssh2", "LINUX-SRV", "admin", "Failed password for invalid user"),
-        (str(uuid.uuid4()), (now - timedelta(hours=4)).isoformat() + "Z", "syslog", "None", "info", "Accepted publickey for root from 10.0.0.5", "LINUX-SRV", "root", "Accepted publickey")
-    ]
+    users = ["admin", "root", "jsmith", "sysadmin", "postgres", "db_service", "Guest"]
+    ips = ["192.168.1.50", "10.0.19.57", "172.16.0.5", "202.83.18.79", "10.140.10.203", "8.8.8.8"]
+    
+    # 1. FortiGate IPS Logs (Medium/High)
+    for i in range(30):
+        t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
+        src_ip = random.choice(ips)
+        dst_ip = random.choice(ips)
+        raw = f'<185>date={t.strftime("%Y-%m-%d")} time={t.strftime("%H:%M:%S")} devname="ACX-MACOM-FW01" devid="FGVM4VTM25000633" eventtime={int(t.timestamp()*1000000000)} tz="+0530" logid="0419016384" type="utm" subtype="ips" eventtype="signature" level="alert" vd="root" severity="medium" srcip={src_ip} srccountry="India" dstip={dst_ip} dstcountry="Reserved" srcintf="port2" srcintfrole="undefined" dstintf="MAOFIN-UAT" dstintfrole="lan" sessionid=1616798053 action="detected" proto=6 service="HTTP" policyid=158 poluuid="6b6363ca-abd0-51ee-6948-804c9eb73216" policytype="policy" attack="MS.IIS.WebDAV.Authentication.Bypass" srcport={random.randint(1024, 65535)} dstport=443 hostname="uat.mahofin.in" url="/" agent="Mozilla/5.0 (compatible; Nmap Scripting Engine; https://nmap.org/book/nse.html)" httpmethod="PROPFIND" direction="outgoing" attackid=17445 profile="Mahofin_IPS_Policy" ref=http://www.fortinet.com/ids/VID17445 incidentserialno=323087043 msg="web_server: MS.IIS.WebDAV.Authentication.Bypass" crscore=10 craction=16384 crlevel="medium"'
+        extracted = json.dumps({"srcip": src_ip, "dstip": dst_ip, "attack": "MS.IIS.WebDAV.Authentication.Bypass", "action": "detected", "agent": "Nmap Scripting Engine"})
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "FortiGate Firewall", "17445", "medium", "web_server: MS.IIS.WebDAV.Authentication.Bypass", "ACX-MACOM-FW01", None, raw, extracted))
+
+    # 2. FortiWeb WAF Critical Event
+    for i in range(15):
+        t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
+        raw = f'<2>date={t.strftime("%Y-%m-%d")} time={t.strftime("%H:%M:%S")} devname=acxdc-Mahofin-WAF01 device_id=FADVMSTM24000612 log_id=0003000200 type=event subtype=system pri=critical vd=root msg_id=1646440413 submod="none" user="none" ui="none" action="none" status="success" logdesc="Certification" msg="Local certificate test23 is expired !!"'
+        extracted = json.dumps({"status": "success", "logdesc": "Certification", "msg": "Local certificate test23 is expired !!"})
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "FortiWeb WAF", "0003000200", "critical", "Local certificate test23 is expired !!", "acxdc-Mahofin-WAF01", "none", raw, extracted))
+
+    # 3. Windows Security Auditing (Event 4769, 4625, 4688)
+    for i in range(40):
+        t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
+        user = random.choice(users)
+        src_ip = random.choice(ips)
+        raw = f'2026-05-13T20:57:29Z mdmaddcvm2 10.0.19.57 FSM-WUA-WinLog-Security [phCustId]="2009" [customer]="BEST" [monitorStatus]="Success" [Locale]="en-US" [MachineGuid]="ea344bf3-b2b8-4585-bcfc-b4db6033a355" [timeZone]="+0530" [extEventRecvProto]="Windows Agent" [level]="Information" [xml]=<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-a5ba-3e3b0328c30d}}"/><EventID>4769</EventID><Version>2</Version><Level>0</Level><Task>14337</Task><Opcode>0</Opcode><Keywords>0x8020000000000000</Keywords><TimeCreated SystemTime="{t.isoformat()}Z"/><EventRecordID>14531113</EventRecordID><Correlation/><Execution ProcessID="856" ThreadID="6540"/><Channel>Security</Channel><Computer>btmdmaddcvm2.aeslbestami.com</Computer><Security/></System><EventData><Data Name="TargetUserName">{user}</Data><Data Name="TargetDomainName">AESLBESTAMI.COM</Data><Data Name="ServiceName">mdmdbadmin</Data><Data Name="IpAddress">::ffff:{src_ip}</Data></EventData></Event>'
+        extracted = json.dumps({"TargetUserName": user, "IpAddress": src_ip, "EventID": "4769", "ServiceName": "mdmdbadmin"})
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Windows Server", "4769", "info", f"Kerberos service ticket requested for {user}", "btmdmaddcvm2", user, raw, extracted))
+
+    # 4. Linux Syslog Auth Failures
+    for i in range(25):
+        t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
+        user = random.choice(users)
+        src_ip = random.choice(ips)
+        raw = f"{t.strftime('%b %d %H:%M:%S')} ubuntu-web01 sshd[14233]: Failed password for invalid user {user} from {src_ip} port {random.randint(1024, 65535)} ssh2"
+        extracted = json.dumps({"user": user, "src_ip": src_ip, "port": str(random.randint(1024, 65535)), "process": "sshd"})
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Linux Auth", "syslog", "low", f"Failed password for invalid user {user}", "ubuntu-web01", user, raw, extracted))
+
+    # Sort logs chronologically to be realistic
+    logs_data.sort(key=lambda x: x[1])
+
     cursor.executemany("""
-        INSERT INTO logs (id, timestamp, source, event_id, severity, message, hostname, username, raw_log)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO logs (id, timestamp, source, event_id, severity, message, hostname, username, raw_log, extracted_fields)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, logs_data)
     
-    # Sample Alerts
+    # Sample Alerts covering all severities
     alerts_data = [
-        # id, timestamp, title, description, severity, status, source, event_id, mitre_ref, assigned_to
-        (str(uuid.uuid4()), (now - timedelta(minutes=15)).isoformat() + "Z", "Multiple Login Failures", "Detected 3 failed login attempts for user root on WEB-SRV.", "high", "new", "Security", "4625", "T1110", None),
-        (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "Suspicious Service Installation", "A new service 'BackdoorSvc' was installed on DB-01.", "high", "investigating", "System", "7045", "T1543.003", "admin"),
-        (str(uuid.uuid4()), (now - timedelta(minutes=45)).isoformat() + "Z", "Audit Log Cleared", "The security audit log was cleared on Domain Controller DC-01.", "critical", "new", "Security", "1102", "T1070.001", None)
+        (str(uuid.uuid4()), (now - timedelta(minutes=5)).isoformat() + "Z", "Certificate Expiration Warning", "Local certificate test23 is expired on WAF!! This may cause HTTPS traffic failures.", "critical", "new", "FortiWeb WAF", "0003000200", "T1587.004", logs_data[-1][8], logs_data[-1][9], None),
+        (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "WebDAV Authentication Bypass Attempt", "Nmap Scripting Engine detected attempting MS.IIS.WebDAV.Authentication.Bypass vulnerability.", "high", "investigating", "FortiGate Firewall", "17445", "T1190", logs_data[-2][8], logs_data[-2][9], "admin"),
+        (str(uuid.uuid4()), (now - timedelta(hours=2)).isoformat() + "Z", "Multiple SSH Login Failures", "Detected multiple failed password attempts for invalid users from 202.83.18.79.", "medium", "new", "Linux Auth", "syslog", "T1110", logs_data[10][8], logs_data[10][9], None),
+        (str(uuid.uuid4()), (now - timedelta(hours=5)).isoformat() + "Z", "Kerberos Service Ticket Requested Anomaly", "Unusual volume of Kerberos ticket requests for mdmdbadmin service.", "low", "resolved", "Windows Server", "4769", "T1558.003", logs_data[5][8], logs_data[5][9], "admin")
     ]
     cursor.executemany("""
-        INSERT INTO alerts (id, timestamp, title, description, severity, status, source, event_id, mitre_ref, assigned_to)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO alerts (id, timestamp, title, description, severity, status, source, event_id, mitre_ref, raw_log, extracted_fields, assigned_to)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, alerts_data)
+
+    # Use Cases supporting these alerts
+    uc_data = [
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiWeb: Expired Certificate", "Detects local certificate expiration events on FortiWeb WAF to prevent service disruption.", "match", "0003000200", "T1587.004", None, "critical", 1, '{"field": "msg", "operator": "contains", "value": "expired"}'),
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiGate: Nmap WebDAV Scan", "Detects automated Nmap WebDAV authentication bypass vulnerability scanning attempts.", "match", "17445", "T1190", None, "high", 1, '{"field": "agent", "operator": "contains", "value": "Nmap"}'),
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "Windows: Kerberos Ticket Anomalies", "Detects abnormal volume of Kerberos TGS requests (Event 4769).", "threshold", "4769", "T1558.003", 50, "low", 1, None)
+    ]
+    cursor.executemany("""
+        INSERT INTO use_cases (id, title, description, type, event_id, mitre_technique, threshold_count, severity, active, rule_logic)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, uc_data)
+
 
 def _seed_use_cases(cursor: sqlite3.Cursor):
     """Seed comprehensive generic detection rules for Windows and Linux."""
