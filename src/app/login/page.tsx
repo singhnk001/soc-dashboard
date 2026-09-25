@@ -33,8 +33,8 @@ export default function LoginPage() {
         const data = await res.json();
         
         if (res.ok && data.status === 'success') {
-          // In a real app, you would set a cookie/JWT here
           localStorage.setItem('user', JSON.stringify(data.user));
+          document.cookie = `soc_session=${data.user.role}; path=/; max-age=86400`;
           router.push('/');
         } else {
           setError(data.detail || 'Invalid verification code');
@@ -55,6 +55,7 @@ export default function LoginPage() {
             setMfaUserId(data.user_id);
           } else if (data.status === 'success') {
             localStorage.setItem('user', JSON.stringify(data.user));
+            document.cookie = `soc_session=${data.user.role}; path=/; max-age=86400`;
             router.push('/');
           }
         } else {

@@ -1216,14 +1216,80 @@ class LoginRequest(BaseModel):
 def login(req: LoginRequest):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT username, role, status, real_name FROM users WHERE username COLLATE NOCASE = ? AND password = ?", (req.username, req.password))
+    cursor.execute("SELECT id, username, role, status, real_name, mfa_secret FROM users WHERE username COLLATE NOCASE = ? AND password = ?", (req.username, req.password))
     user = cursor.fetchone()
     conn.close()
+    
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if user[2] != 'Active':
+    if user["status"] != 'Active':
         raise HTTPException(status_code=403, detail="Account disabled")
-    return {"username": user[0], "role": user[1], "status": user[2], "real_name": user[3] or user[0]}
+        
+    user_dict = dict(user)
+    mfa_secret = user_dict.pop("mfa_secret", None)
+    if mfa_secret:
+        return {"status": "mfa_required", "user_id": user_dict["id"]}
+    return {"status": "success", "user": user_dict}
+
+class MFALoginRequest(BaseModel):
+    user_id: str
+    code: str
+
+@app.post("/api/auth/login/mfa")
+def login_mfa(req: MFALoginRequest):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, role, status, real_name, mfa_secret FROM users WHERE id = ?", (req.user_id,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if user and user["mfa_secret"]:
+        totp = pyotp.TOTP(user["mfa_secret"])
+        if totp.verify(req.code):
+            user_dict = dict(user)
+            user_dict.pop("mfa_secret", None)
+            return {"status": "success", "user": user_dict}
+        else:
+            raise HTTPException(status_code=401, detail="Invalid MFA code")
+    raise HTTPException(status_code=401, detail="User not found or MFA not enabled")
+
+class MFASetupRequest(BaseModel):
+    user_id: str
+
+@app.post("/api/auth/mfa/setup")
+def mfa_setup(req: MFASetupRequest):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users WHERE id = ?", (req.user_id,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=user["username"], issuer_name="SOC Dashboard")
+    
+    return {"status": "success", "secret": secret, "uri": uri}
+
+class MFAVerifyRequest(BaseModel):
+    user_id: str
+    secret: str
+    code: str
+
+@app.post("/api/auth/mfa/verify")
+def mfa_verify(req: MFAVerifyRequest):
+    totp = pyotp.TOTP(req.secret)
+    if totp.verify(req.code):
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET mfa_secret = ? WHERE id = ?", (req.secret, req.user_id))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    raise HTTPException(status_code=400, detail="Invalid verification code")
+
 
 class UserCreate(BaseModel):
     username: str
