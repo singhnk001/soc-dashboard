@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ShieldAlert, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Server, FileSearch, Shield, Activity, Globe, Code } from "lucide-react";
+import { ShieldAlert, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Server, FileSearch, Globe, Code, Settings } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function ThreatIntelPage() {
@@ -13,12 +13,22 @@ export default function ThreatIntelPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   
+  // Settings State
+  const [apiKeys, setApiKeys] = useState({
+    VIRUSTOTAL_API_KEY: '',
+    IBM_XFORCE_KEY: '',
+    IBM_XFORCE_PASS: '',
+    CISCO_TALOS_KEY: ''
+  });
+
   // VT Lookup State
   const [vtInput, setVtInput] = useState("");
   const [vtType, setVtType] = useState("IP");
+  const [vtProvider, setVtProvider] = useState("VirusTotal");
   const [vtResult, setVtResult] = useState<any>(null);
   const [vtLoading, setVtLoading] = useState(false);
   const [vtError, setVtError] = useState("");
@@ -40,7 +50,20 @@ export default function ThreatIntelPage() {
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
-  useEffect(() => { fetchFeeds(); }, []);
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      if (data.status === 'success' && data.data) {
+        setApiKeys(prev => ({...prev, ...data.data}));
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => { 
+    fetchFeeds(); 
+    fetchSettings();
+  }, []);
 
   const toggleRow = async (id: string) => {
     const newExpanded = new Set(expandedRows);
@@ -137,6 +160,17 @@ export default function ThreatIntelPage() {
     fetchFeeds();
   };
   
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(apiKeys)
+    });
+    setShowSettings(false);
+    fetchSettings(); // refresh masked versions
+  };
+
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vtInput) return;
@@ -144,7 +178,7 @@ export default function ThreatIntelPage() {
     setVtError("");
     setVtResult(null);
     try {
-      const url = '/api/threat-intel/lookup?ioc=' + encodeURIComponent(vtInput.trim()) + '&ioc_type=' + vtType;
+      const url = '/api/threat-intel/lookup?ioc=' + encodeURIComponent(vtInput.trim()) + '&ioc_type=' + vtType + '&provider=' + encodeURIComponent(vtProvider);
       const res = await fetch(url);
       const data = await res.json();
       if (data.status === 'success') {
@@ -270,7 +304,7 @@ export default function ThreatIntelPage() {
                             <div className="px-14 py-6 border-l-2 border-blue-500">
                               <div className="flex justify-between items-center mb-4">
                                 <h4 className="text-gray-300 font-medium flex items-center gap-2">
-                                  <Activity size={16} className="text-blue-500"/> Previewing Top Indicators
+                                  <ShieldAlert size={16} className="text-blue-500"/> Previewing Top Indicators
                                 </h4>
                                 {indicators[f.id] && indicators[f.id].length > 0 && (
                                   <button 
@@ -326,13 +360,28 @@ export default function ThreatIntelPage() {
 
       {activeTab === 'lookup' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 shadow-xl">
-            <h2 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
               <Globe className="text-indigo-400" /> Deep Indicator Lookup
             </h2>
-            <p className="text-gray-400 text-sm mb-6">Query VirusTotal in real-time to analyze suspicious IPs, URLs, Domains, or File Hashes.</p>
+            <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 px-3 py-2 bg-[#1a1f2e] hover:bg-gray-800 border border-gray-700 text-gray-300 rounded transition-colors text-sm">
+              <Settings size={16} /> API Settings
+            </button>
+          </div>
+          
+          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 shadow-xl">
+            <p className="text-gray-400 text-sm mb-6">Query external intelligence providers in real-time to analyze suspicious IPs, URLs, Domains, or File Hashes.</p>
             
             <form onSubmit={handleLookup} className="flex gap-4">
+              <select 
+                value={vtProvider} 
+                onChange={e => setVtProvider(e.target.value)}
+                className="w-48 bg-[#11141e] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-indigo-500 font-medium"
+              >
+                <option value="VirusTotal">VirusTotal</option>
+                <option value="IBM X-Force">IBM X-Force</option>
+                <option value="Cisco Talos">Cisco Talos</option>
+              </select>
               <select 
                 value={vtType} 
                 onChange={e => setVtType(e.target.value)}
@@ -374,55 +423,89 @@ export default function ThreatIntelPage() {
             </div>
           )}
 
-          {vtResult && vtResult.attributes && (
+          {vtResult && (
             <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-6 shadow-xl animate-in fade-in">
               <div className="flex justify-between items-start mb-8">
                 <div>
-                  <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                  <div className="flex items-center gap-3 text-xl font-bold text-white mb-1">
                     {vtType === 'IP' ? <Server className="text-blue-400"/> : vtType === 'Domain' ? <Globe className="text-emerald-400"/> : <Code className="text-purple-400"/>}
-                    {vtResult.id || vtInput}
-                  </h3>
+                    {vtInput}
+                  </div>
+                  <div className="text-sm text-indigo-400 mb-2 font-medium">Provider: {vtProvider}</div>
                   <div className="flex gap-4 mt-2 text-sm text-gray-400">
-                    {vtResult.attributes.as_owner && <span>Owner: <span className="text-gray-200">{vtResult.attributes.as_owner}</span></span>}
-                    {vtResult.attributes.country && <span>Country: <span className="text-gray-200">{vtResult.attributes.country}</span></span>}
-                    {vtResult.attributes.meaningful_name && <span>File Name: <span className="text-gray-200">{vtResult.attributes.meaningful_name}</span></span>}
+                    {vtResult.owner && <span>Owner: <span className="text-gray-200">{vtResult.owner}</span></span>}
+                    {vtResult.country && <span>Country: <span className="text-gray-200">{vtResult.country}</span></span>}
+                    {vtResult.name && <span>Context/Name: <span className="text-gray-200">{vtResult.name}</span></span>}
                   </div>
                 </div>
                 
                 <div className="text-right">
                   <div className="text-sm text-gray-400 mb-1">Reputation Score</div>
                   <div className={`text-3xl font-bold ${
-                    (vtResult.attributes.reputation || 0) < 0 ? 'text-rose-500' : 
-                    (vtResult.attributes.reputation || 0) > 0 ? 'text-emerald-500' : 'text-gray-300'
+                    vtProvider === 'VirusTotal' ? (
+                      (vtResult.reputation || 0) < 0 ? 'text-rose-500' : (vtResult.reputation || 0) > 0 ? 'text-emerald-500' : 'text-gray-300'
+                    ) : (
+                      (vtResult.reputation || 0) >= 7 ? 'text-rose-500' : (vtResult.reputation || 0) >= 4 ? 'text-amber-500' : 'text-emerald-500'
+                    )
                   }`}>
-                    {vtResult.attributes.reputation || 0}
+                    {vtResult.reputation || 0}
                   </div>
                 </div>
               </div>
 
               <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Analysis Results</h4>
               
-              <div className="grid grid-cols-4 gap-4 mb-8">
+              <div className="grid grid-cols-4 gap-4 mb-2">
                 <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-rose-500">{vtResult.attributes.last_analysis_stats?.malicious || 0}</div>
+                  <div className="text-3xl font-bold text-rose-500">{vtResult.stats?.malicious || 0}</div>
                   <div className="text-xs text-rose-400 uppercase tracking-wide mt-1">Malicious</div>
                 </div>
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-amber-500">{vtResult.attributes.last_analysis_stats?.suspicious || 0}</div>
+                  <div className="text-3xl font-bold text-amber-500">{vtResult.stats?.suspicious || 0}</div>
                   <div className="text-xs text-amber-400 uppercase tracking-wide mt-1">Suspicious</div>
                 </div>
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-emerald-500">{vtResult.attributes.last_analysis_stats?.harmless || 0}</div>
+                  <div className="text-3xl font-bold text-emerald-500">{vtResult.stats?.harmless || 0}</div>
                   <div className="text-xs text-emerald-400 uppercase tracking-wide mt-1">Harmless</div>
                 </div>
                 <div className="bg-gray-700/20 border border-gray-700/50 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-gray-400">{vtResult.attributes.last_analysis_stats?.undetected || 0}</div>
+                  <div className="text-3xl font-bold text-gray-400">{vtResult.stats?.undetected || 0}</div>
                   <div className="text-xs text-gray-500 uppercase tracking-wide mt-1">Undetected</div>
                 </div>
               </div>
-
             </div>
           )}
+        </div>
+      )}
+
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-[#1a1f2e] p-8 rounded-xl w-full max-w-lg border border-gray-700 shadow-2xl slide-in-from-bottom-4">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <Settings className="text-indigo-400" /> API Settings
+            </h2>
+            <form onSubmit={handleSaveSettings} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">VirusTotal API Key</label>
+                <input type="text" placeholder={apiKeys.VIRUSTOTAL_API_KEY} onChange={e => setApiKeys({...apiKeys, VIRUSTOTAL_API_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+              </div>
+              <div className="pt-4 border-t border-gray-800">
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">IBM X-Force Key</label>
+                <input type="text" placeholder={apiKeys.IBM_XFORCE_KEY} onChange={e => setApiKeys({...apiKeys, IBM_XFORCE_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm mb-3" />
+                
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">IBM X-Force Password</label>
+                <input type="password" placeholder={apiKeys.IBM_XFORCE_PASS ? '********' : ''} onChange={e => setApiKeys({...apiKeys, IBM_XFORCE_PASS: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+              </div>
+              <div className="pt-4 border-t border-gray-800">
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Cisco Talos API Key</label>
+                <input type="text" placeholder={apiKeys.CISCO_TALOS_KEY} onChange={e => setApiKeys({...apiKeys, CISCO_TALOS_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+              </div>
+              <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-800">
+                <button type="button" onClick={() => setShowSettings(false)} className="px-5 py-2.5 hover:bg-gray-800 rounded-lg text-gray-300 font-medium transition-colors">Cancel</button>
+                <button type="submit" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white font-medium shadow-lg shadow-indigo-900/20 transition-colors">Save Keys</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

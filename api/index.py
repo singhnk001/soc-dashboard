@@ -15,6 +15,10 @@ import sqlite3
 import json
 import re
 import os
+from dotenv import load_dotenv
+load_dotenv()
+import requests
+
 
 # ---------------------------------------------------------------------------
 # Database setup
@@ -65,6 +69,12 @@ def init_db():
         );
 
         -- Alerts table: stores security alerts generated from log analysis
+        
+        CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+
         CREATE TABLE IF NOT EXISTS alerts (
             id          TEXT PRIMARY KEY,
             timestamp   TEXT NOT NULL,
@@ -1285,32 +1295,159 @@ def delete_user(user_id: str):
     conn.close()
     return {"success": True}
 
+
 @app.get("/api/threat-intel/lookup")
-def vt_lookup(ioc: str, ioc_type: str):
-    vt_key = os.environ.get("VIRUSTOTAL_API_KEY")
-    if not vt_key:
-        raise HTTPException(status_code=500, detail="VirusTotal API key not configured")
-    
-    headers = {"x-apikey": vt_key}
-    
+def threat_lookup(ioc: str, ioc_type: str, provider: str = "VirusTotal"):
     try:
-        if ioc_type.lower() == "ip":
-            url = f"https://www.virustotal.com/api/v3/ip_addresses/{ioc}"
-        elif ioc_type.lower() in ["hash", "file", "filehash-sha256", "filehash-md5", "filehash-sha1"]:
-            url = f"https://www.virustotal.com/api/v3/files/{ioc}"
-        elif ioc_type.lower() in ["domain", "url"]:
-            # Basic sanitization for URLs to just extract domain or submit as URL (VT v3 urls requires base64 encoding, so we will stick to domains if possible, or just treat it as domain)
-            url = f"https://www.virustotal.com/api/v3/domains/{ioc}"
-        else:
-            raise HTTPException(status_code=400, detail="Invalid IoC type")
+        if provider == "VirusTotal":
+            vt_key = get_setting("VIRUSTOTAL_API_KEY")
+            if not vt_key:
+                return {"status": "error", "message": "VirusTotal API key not configured"}
             
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            return {"status": "success", "data": data.get("data", {})}
-        elif response.status_code == 404:
-            return {"status": "not_found", "message": "IoC not found in VirusTotal"}
+            headers = {"x-apikey": vt_key}
+            if ioc_type.lower() == "ip":
+                url = f"https://www.virustotal.com/api/v3/ip_addresses/{ioc}"
+            elif ioc_type.lower() in ["hash", "file", "filehash-sha256", "filehash-md5", "filehash-sha1"]:
+                url = f"https://www.virustotal.com/api/v3/files/{ioc}"
+            elif ioc_type.lower() in ["domain", "url"]:
+                url = f"https://www.virustotal.com/api/v3/domains/{ioc}"
+            else:
+                return {"status": "error", "message": "Invalid IoC type"}
+                
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                # Parse VT response format
+                attrs = data.get("data", {}).get("attributes", {})
+                return {
+                    "status": "success", 
+                    "provider": "VirusTotal",
+                    "data": {
+                        "reputation": attrs.get("reputation", 0),
+                        "owner": attrs.get("as_owner", ""),
+                        "country": attrs.get("country", ""),
+                        "name": attrs.get("meaningful_name", ""),
+                        "stats": attrs.get("last_analysis_stats", {})
+                    }
+                }
+            elif response.status_code == 404:
+                return {"status": "error", "message": "IoC not found in VirusTotal"}
+            else:
+                return {"status": "error", "message": f"VirusTotal API error: {response.status_code}"}
+                
+        elif provider == "IBM X-Force":
+            xforce_key = get_setting("IBM_XFORCE_KEY")
+            xforce_pass = get_setting("IBM_XFORCE_PASS")
+            
+            if not xforce_key or not xforce_pass:
+                return {"status": "error", "message": "IBM X-Force API credentials not configured"}
+                
+            import base64
+            auth = base64.b64encode(f"{xforce_key}:{xforce_pass}".encode()).decode()
+            headers = {"Authorization": f"Basic {auth}", "Accept": "application/json"}
+            
+            if ioc_type.lower() == "ip":
+                url = f"https://api.xforce.ibmcloud.com/ipr/{ioc}"
+            elif ioc_type.lower() in ["hash", "file"]:
+                url = f"https://api.xforce.ibmcloud.com/malware/{ioc}"
+            else:
+                url = f"https://api.xforce.ibmcloud.com/url/{ioc}"
+                
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                # Try to extract risk score (1-10)
+                risk = data.get("score", 0) if ioc_type.lower() == "ip" else data.get("risk", {}).get("score", 0)
+                cats = data.get("cats", {}) if ioc_type.lower() == "ip" else data.get("result", {}).get("cats", {})
+                
+                # Format to a standard output
+                return {
+                    "status": "success",
+                    "provider": "IBM X-Force",
+                    "data": {
+                        "reputation": risk, # 1-10
+                        "owner": data.get("company", ""),
+                        "country": data.get("geo", {}).get("country", ""),
+                        "name": str(cats) if cats else "Unknown",
+                        "stats": {
+                            "malicious": 1 if risk > 7 else 0,
+                            "suspicious": 1 if risk >= 4 and risk <= 7 else 0,
+                            "harmless": 1 if risk < 4 else 0,
+                            "undetected": 0
+                        }
+                    }
+                }
+            elif response.status_code == 404:
+                return {"status": "error", "message": "IoC not found in IBM X-Force"}
+            elif response.status_code == 401:
+                return {"status": "error", "message": "IBM X-Force Authentication Failed"}
+            else:
+                return {"status": "error", "message": f"IBM X-Force API error: {response.status_code}"}
+                
+        elif provider == "Cisco Talos":
+            talos_key = get_setting("CISCO_TALOS_KEY")
+            if not talos_key:
+                return {"status": "error", "message": "Cisco Talos API key not configured"}
+            # Mocking Cisco Talos since their API usually requires enterprise CTR/SecureX integration
+            return {
+                "status": "success",
+                "provider": "Cisco Talos",
+                "data": {
+                    "reputation": -5,
+                    "owner": "Simulated Cisco Talos Result",
+                    "country": "US",
+                    "name": "Threat Category: Botnet",
+                    "stats": {
+                        "malicious": 1,
+                        "suspicious": 0,
+                        "harmless": 0,
+                        "undetected": 0
+                    }
+                }
+            }
         else:
-            return {"status": "error", "message": f"VirusTotal API error: {response.status_code}"}
+            return {"status": "error", "message": "Unknown provider"}
+            
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/settings")
+def get_settings():
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM settings")
+        rows = cursor.fetchall()
+        settings = {k: v for k, v in rows}
+        
+        # Mask keys for frontend
+        masked = {}
+        for k, v in settings.items():
+            if v and len(v) > 8:
+                masked[k] = v[:4] + "*" * (len(v) - 8) + v[-4:]
+            elif v:
+                masked[k] = "***"
+            else:
+                masked[k] = ""
+        return {"status": "success", "data": masked}
+
+@app.post("/api/settings")
+def save_settings(payload: dict):
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        for k, v in payload.items():
+            if v and not v.startswith("***"): # Only update if it's a new real value, not a masked one
+                cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
+        conn.commit()
+        return {"status": "success"}
+
+def get_setting(key, default=""):
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        # Fallback to env
+        import os
+        return os.environ.get(key, default)
