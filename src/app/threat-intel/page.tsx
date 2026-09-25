@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ShieldAlert, Search, Plus, RefreshCw, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { ShieldAlert, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function ThreatIntelPage() {
@@ -12,6 +12,7 @@ export default function ThreatIntelPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   
   const [form, setForm] = useState({
@@ -19,7 +20,8 @@ export default function ThreatIntelPage() {
     url: '',
     type: 'API',
     category: 'Malware IPs',
-    schedule: 'Daily at 00:00 AM'
+    freq: 'Daily',
+    time: '00:00 AM'
   });
 
   const fetchFeeds = async () => {
@@ -74,16 +76,80 @@ export default function ThreatIntelPage() {
     fetchFeeds();
   };
 
+  const handleEdit = (feed: any) => {
+    setEditingId(feed.id);
+    let freq = 'Daily';
+    let time = '00:00 AM';
+    if (feed.schedule) {
+      if (feed.schedule.includes(' at ')) {
+        const parts = feed.schedule.split(' at ');
+        freq = parts[0];
+        time = parts[1];
+      } else {
+        freq = feed.schedule;
+      }
+    }
+    setForm({
+      name: feed.name,
+      url: feed.url,
+      type: feed.type,
+      category: feed.category,
+      freq,
+      time
+    });
+    setShowModal(true);
+  };
+
+  const openAddModal = () => {
+    setEditingId(null);
+    setForm({ name: '', url: '', type: 'API', category: 'Malware IPs', freq: 'Daily', time: '00:00 AM' });
+    setShowModal(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/threat-feeds', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    });
+    const finalSchedule = form.freq + ' at ' + form.time;
+    const payload = { ...form, schedule: finalSchedule };
+    
+    if (editingId) {
+      await fetch('/api/threat-feeds/' + editingId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      await fetch('/api/threat-feeds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+    
     setShowModal(false);
-    setForm({ name: '', url: '', type: 'API', category: 'Malware IPs', schedule: 'Daily at 00:00 AM' });
     fetchFeeds();
+  };
+
+  const downloadCSV = (feedName: string, iocs: any[]) => {
+    if (!iocs || iocs.length === 0) return;
+    
+    const headers = ['IoC Type', 'Indicator', 'Description'];
+    const csvRows = [headers.join(',')];
+    
+    for (const ioc of iocs) {
+      const type = `"${(ioc.type || '').replace(/"/g, '""')}"`;
+      const indicator = `"${(ioc.indicator || '').replace(/"/g, '""')}"`;
+      const desc = `"${(ioc.description || '').replace(/"/g, '""')}"`;
+      csvRows.push([type, indicator, desc].join(','));
+    }
+    
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", feedName.replace(/\s+/g, '_') + "_indicators.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredFeeds = feeds.filter((f: any) => 
@@ -102,7 +168,7 @@ export default function ThreatIntelPage() {
         </div>
         
         <button 
-          onClick={() => setShowModal(true)}
+          onClick={openAddModal}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
         >
           <Plus size={16} /> Add Threat Feed
@@ -163,6 +229,9 @@ export default function ThreatIntelPage() {
                         <button onClick={() => handleSync(f.id)} className="text-blue-400 hover:text-blue-300" title="Sync Now">
                           <RefreshCw size={18} />
                         </button>
+                        <button onClick={() => handleEdit(f)} className="text-gray-400 hover:text-gray-300" title="Edit Feed">
+                          <Edit2 size={18} />
+                        </button>
                         <button onClick={() => handleDelete(f.id)} className="text-red-400 hover:text-red-300" title="Delete">
                           <Trash2 size={18} />
                         </button>
@@ -172,34 +241,46 @@ export default function ThreatIntelPage() {
                   {expandedRows.has(f.id) && (
                     <tr className="bg-[#0a0e1a]">
                       <td colSpan={8} className="p-6">
-                        <h4 className="text-white font-medium mb-3">Top Indicators Extracted</h4>
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-white font-medium">Top Indicators Extracted</h4>
+                          {indicators[f.id] && indicators[f.id].length > 0 && (
+                            <button 
+                              onClick={() => downloadCSV(f.name, indicators[f.id])}
+                              className="flex items-center gap-2 px-3 py-1 bg-[#11141e] border border-gray-700 hover:bg-gray-800 text-gray-300 rounded text-sm transition-colors"
+                            >
+                              <Download size={14} /> Export CSV
+                            </button>
+                          )}
+                        </div>
                         {loadingIndicators.has(f.id) ? (
                           <div className="text-gray-400 animate-pulse">Loading indicators...</div>
                         ) : !indicators[f.id] || indicators[f.id].length === 0 ? (
                           <div className="text-gray-500">No indicators found.</div>
                         ) : (
-                          <table className="w-full bg-[#11141e] border border-gray-800 rounded-sm">
-                            <thead>
-                              <tr className="border-b border-gray-800 text-gray-400">
-                                <th className="px-4 py-2 font-medium w-48 text-left">IoC Type</th>
-                                <th className="px-4 py-2 font-medium text-left">Indicator</th>
-                                <th className="px-4 py-2 font-medium text-left">Description</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-800">
-                              {indicators[f.id].map((ioc: any, idx: number) => (
-                                <tr key={idx} className="hover:bg-gray-800/30">
-                                  <td className="px-4 py-2">
-                                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
-                                      {ioc.type}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-2 text-white font-mono text-sm text-left">{ioc.indicator}</td>
-                                  <td className="px-4 py-2 text-gray-400 text-left">{ioc.description}</td>
+                          <div className="max-h-96 overflow-y-auto border border-gray-800 rounded-sm custom-scrollbar">
+                            <table className="w-full bg-[#11141e]">
+                              <thead className="sticky top-0 bg-[#11141e] shadow-sm z-10">
+                                <tr className="border-b border-gray-800 text-gray-400">
+                                  <th className="px-4 py-2 font-medium w-48 text-left">IoC Type</th>
+                                  <th className="px-4 py-2 font-medium text-left">Indicator</th>
+                                  <th className="px-4 py-2 font-medium text-left">Description</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody className="divide-y divide-gray-800">
+                                {indicators[f.id].map((ioc: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-gray-800/30">
+                                    <td className="px-4 py-2">
+                                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
+                                        {ioc.type}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-2 text-white font-mono text-sm text-left">{ioc.indicator}</td>
+                                    <td className="px-4 py-2 text-gray-400 text-left truncate max-w-xs" title={ioc.description}>{ioc.description}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -214,7 +295,7 @@ export default function ThreatIntelPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-[#1a1f2e] p-6 rounded-lg w-full max-w-md border border-gray-800">
-            <h2 className="text-xl font-bold text-white mb-4">Add Threat Intel Feed</h2>
+            <h2 className="text-xl font-bold text-white mb-4">{editingId ? 'Edit Threat Intel Feed' : 'Add Threat Intel Feed'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Feed Name</label>
@@ -245,11 +326,27 @@ export default function ThreatIntelPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Pulling Schedule</label>
-                <input required type="text" value={form.schedule} onChange={e => setForm({...form, schedule: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white" />
+                <div className="flex gap-2">
+                  <select value={form.freq} onChange={e => setForm({...form, freq: e.target.value})} className="w-1/2 bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                    <option>Daily</option>
+                    <option>Hourly</option>
+                    <option>Weekly</option>
+                    <option>Monthly</option>
+                  </select>
+                  <div className="flex items-center text-gray-400">at</div>
+                  <select value={form.time} onChange={e => setForm({...form, time: e.target.value})} className="w-1/2 bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                    {Array.from({length: 24}).map((_, i) => {
+                      const hour = i === 0 ? 12 : i > 12 ? i - 12 : i;
+                      const ampm = i >= 12 ? 'PM' : 'AM';
+                      const formatted = `${hour.toString().padStart(2, '0')}:00 ${ampm}`;
+                      return <option key={i} value={formatted}>{formatted}</option>;
+                    })}
+                  </select>
+                </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 hover:bg-gray-800 rounded text-gray-300">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white">Add Feed</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white">{editingId ? 'Save Changes' : 'Add Feed'}</button>
               </div>
             </form>
           </div>

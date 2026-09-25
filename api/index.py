@@ -1140,7 +1140,7 @@ def sync_feed(feed_id: str):
                 t = clean_r.get('Indicator type', 'Unknown')
                 i = clean_r.get('Indicator', '')
                 d = clean_r.get('Description', '')
-                if i:
+                if i and i != 'www.linkedin.com':
                     cursor.execute("INSERT INTO threat_indicators (id, feed_id, type, indicator, description) VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), feed_id, t, i, d))
                     count += 1
             
@@ -1160,6 +1160,14 @@ def delete_feed(feed_id: str):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM threat_feeds WHERE id = ?", (feed_id,))
         cursor.execute("DELETE FROM threat_indicators WHERE feed_id = ?", (feed_id,))
+        conn.commit()
+        return {"status": "success"}
+
+@app.put("/api/threat-feeds/{feed_id}")
+def update_feed(feed_id: str, req: FeedRequest):
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE threat_feeds SET name = ?, url = ?, type = ?, category = ?, schedule = ? WHERE id = ?", (req.name, req.url, req.type, req.category, req.schedule, feed_id))
         conn.commit()
         return {"status": "success"}
 
