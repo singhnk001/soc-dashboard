@@ -35,7 +35,7 @@ export default function Sidebar() {
     { name: 'Use Cases', href: '/usecases', icon: Target },
     { name: 'MITRE ATT&CK', href: '/mitre', icon: Shield },
     { name: 'Alerts', href: '/alerts', icon: Bell },
-    { name: 'Settings, ShieldAlert', href: '/settings', icon: Settings, ShieldAlert },
+    { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
   if (pathname === '/login') return null;
