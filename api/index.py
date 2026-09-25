@@ -1027,6 +1027,39 @@ def purge_old_logs(days: int = Query(30, ge=1)):
     return {"status": "purged", "deleted": deleted, "retention_days": days}
 
 
+
+@app.get("/api/threat-intel")
+def get_threat_intel():
+    """Fetch Threat Intelligence from AlienVault OTX."""
+    import urllib.request
+    import csv
+    from io import StringIO
+    
+    url = "https://otx.alienvault.com/otxapi/pulses/6a3407d69c9a31c90e0debe2/export/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IlNJTkdITkswMDEiLCJ2YWx1ZSI6WyI2YTM0MDdkNjljOWEzMWM5MGUwZGViZTIiLCJjc3YiXSwiZXhwIjoxNzkwNDU1OTY4fQ.W073M-1h5Jx10LfkftEhX6hvwe3YjFzdrdvvBCukumM&format=csv"
+    
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        response = urllib.request.urlopen(req).read().decode('utf-8')
+        
+        # Parse CSV
+        f = StringIO(response)
+        reader = csv.DictReader(f)
+        
+        results = []
+        for row in reader:
+            # Clean keys since CSV has BOM or weird quotes sometimes
+            clean_row = {k.strip().replace('"', ''): v.strip().replace('"', '') for k, v in row.items()}
+            # Keys expected: Indicator type, Indicator, Description
+            results.append({
+                "type": clean_row.get('Indicator type', 'Unknown'),
+                "indicator": clean_row.get('Indicator', ''),
+                "description": clean_row.get('Description', '')
+            })
+            
+        return {"status": "success", "count": len(results), "data": results}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "data": []}
+
 class LoginRequest(BaseModel):
     username: str
     password: str

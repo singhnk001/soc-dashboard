@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Shield, Bell, Settings, Menu, Target, Code, Server } from 'lucide-react';
+import { LayoutDashboard, FileText, Shield, Bell, Settings, ShieldAlert, Menu, Target, Code, Server } from 'lucide-react';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -35,7 +35,7 @@ export default function Sidebar() {
     { name: 'Use Cases', href: '/usecases', icon: Target },
     { name: 'MITRE ATT&CK', href: '/mitre', icon: Shield },
     { name: 'Alerts', href: '/alerts', icon: Bell },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Settings, ShieldAlert', href: '/settings', icon: Settings, ShieldAlert },
   ];
 
   if (pathname === '/login') return null;
