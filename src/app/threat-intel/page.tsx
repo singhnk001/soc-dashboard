@@ -492,10 +492,11 @@ export default function ThreatIntelPage() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">VirusTotal API Key</label>
                 {apiKeys.VIRUSTOTAL_API_KEY && !apiKeys.VIRUSTOTAL_API_KEY.includes('***Edit') ? (
                   <div className="flex items-center justify-between bg-[#11141e] border border-emerald-500/30 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-                      <Check size={16} /> Configured ({apiKeys.VIRUSTOTAL_API_KEY})
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium overflow-hidden">
+                      <Check size={16} className="flex-shrink-0" /> 
+                      <span className="truncate">Configured ({apiKeys.VIRUSTOTAL_API_KEY})</span>
                     </div>
-                    <button type="button" onClick={() => setApiKeys({...apiKeys, VIRUSTOTAL_API_KEY: ''})} className="text-gray-400 hover:text-white text-xs underline">Edit</button>
+                    <button type="button" onClick={() => setApiKeys({...apiKeys, VIRUSTOTAL_API_KEY: ''})} className="text-gray-400 hover:text-white text-xs underline flex-shrink-0 ml-4">Edit</button>
                   </div>
                 ) : (
                   <input type="text" placeholder="Enter API Key..." value={apiKeys.VIRUSTOTAL_API_KEY} onChange={e => setApiKeys({...apiKeys, VIRUSTOTAL_API_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
@@ -507,10 +508,11 @@ export default function ThreatIntelPage() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">IBM X-Force Credentials</label>
                 {apiKeys.IBM_XFORCE_KEY && !apiKeys.IBM_XFORCE_KEY.includes('***Edit') ? (
                   <div className="flex items-center justify-between bg-[#11141e] border border-emerald-500/30 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-                      <Check size={16} /> Configured ({apiKeys.IBM_XFORCE_KEY})
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium overflow-hidden">
+                      <Check size={16} className="flex-shrink-0" /> 
+                      <span className="truncate">Configured ({apiKeys.IBM_XFORCE_KEY})</span>
                     </div>
-                    <button type="button" onClick={() => setApiKeys({...apiKeys, IBM_XFORCE_KEY: '', IBM_XFORCE_PASS: ''})} className="text-gray-400 hover:text-white text-xs underline">Edit</button>
+                    <button type="button" onClick={() => setApiKeys({...apiKeys, IBM_XFORCE_KEY: '', IBM_XFORCE_PASS: ''})} className="text-gray-400 hover:text-white text-xs underline flex-shrink-0 ml-4">Edit</button>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -525,10 +527,11 @@ export default function ThreatIntelPage() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">Cisco Talos API Key</label>
                 {apiKeys.CISCO_TALOS_KEY && !apiKeys.CISCO_TALOS_KEY.includes('***Edit') ? (
                   <div className="flex items-center justify-between bg-[#11141e] border border-emerald-500/30 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-                      <Check size={16} /> Configured ({apiKeys.CISCO_TALOS_KEY})
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium overflow-hidden">
+                      <Check size={16} className="flex-shrink-0" /> 
+                      <span className="truncate">Configured ({apiKeys.CISCO_TALOS_KEY})</span>
                     </div>
-                    <button type="button" onClick={() => setApiKeys({...apiKeys, CISCO_TALOS_KEY: ''})} className="text-gray-400 hover:text-white text-xs underline">Edit</button>
+                    <button type="button" onClick={() => setApiKeys({...apiKeys, CISCO_TALOS_KEY: ''})} className="text-gray-400 hover:text-white text-xs underline flex-shrink-0 ml-4">Edit</button>
                   </div>
                 ) : (
                   <input type="text" placeholder="Enter API Key..." value={apiKeys.CISCO_TALOS_KEY} onChange={e => setApiKeys({...apiKeys, CISCO_TALOS_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
