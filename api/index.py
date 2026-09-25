@@ -243,6 +243,25 @@ def _seed_sample_data(cursor):
         extracted = json.dumps({"src": "fc00:0:1::2", "dst": "fd00:0:2::5306", "service": "tcp", "policy": "WEB_VIP_4060", "duration": duration, "ibytes": ibytes})
         logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Fortinet ADC", "0100008000", "info", f"SLB Layer4 Traffic routed to WEB_NODE_{random.randint(1,5)}", "ADC-EDGE-01", None, raw, extracted))
 
+    # 6. CrowdStrike Falcon EDR Logs (CEF Format - High/Critical)
+    for i in range(15):
+        t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
+        user = random.choice(users)
+        host = f"WORKSTATION-{random.randint(10, 99)}"
+        detect = random.choice(["Ransomware_indicator", "CredentialDumping_lsass", "SuspiciousPowerShell"])
+        raw = f'CEF:0|CrowdStrike|FalconHost|1.0|DetectionSummaryEvent|High Severity Detection|8|rt={int(t.timestamp()*1000)} src=192.168.1.{random.randint(100,200)} shost={host} duser={user} cs1Label=SensorId cs1=ab1234 cs2Label=DetectName cs2={detect} cs3Label=FileName cs3=malware.exe cs4Label=FilePath cs4=C:\\Users\\{user}\\Downloads\\ cs5Label=CommandLine cs5="malware.exe -bypass" act=blocked msg=A critical behavior was detected and blocked by Falcon sensor.'
+        extracted = json.dumps({"shost": host, "duser": user, "DetectName": detect, "FileName": "malware.exe", "act": "blocked"})
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "CrowdStrike Falcon", "DetectionSummaryEvent", "high", f"CrowdStrike blocked {detect} on {host}", host, user, raw, extracted))
+
+    # 7. Symantec DLP Logs (CEF Format - High)
+    for i in range(15):
+        t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
+        user = random.choice(users)
+        host = f"WORKSTATION-{random.randint(10, 99)}"
+        raw = f'CEF:0|Symantec|DataLossPrevention|15.8|Incident|High Severity Incident|8|rt={int(t.timestamp()*1000)} src=192.168.1.{random.randint(100,200)} shost={host} duser={user} cs1Label=Policy cs1=PCI_DSS_Credit_Card cs2Label=Action cs2=Blocked cs3Label=FileName cs3=customer_data.csv cs4Label=Severity cs4=High msg=User attempted to upload credit card data to unauthorized cloud storage.'
+        extracted = json.dumps({"shost": host, "duser": user, "Policy": "PCI_DSS_Credit_Card", "FileName": "customer_data.csv", "Action": "Blocked"})
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Symantec DLP", "Incident", "high", f"DLP Blocked PCI DSS Data Exfiltration by {user}", host, user, raw, extracted))
+
     # Sort logs chronologically to be realistic
     logs_data.sort(key=lambda x: x[1])
 
@@ -257,7 +276,9 @@ def _seed_sample_data(cursor):
         (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "WebDAV Authentication Bypass Attempt", "Nmap Scripting Engine detected attempting MS.IIS.WebDAV.Authentication.Bypass vulnerability.", "high", "investigating", "FortiGate Firewall", "99999", "T1190", logs_data[-2][8], logs_data[-2][9], "admin"),
         (str(uuid.uuid4()), (now - timedelta(hours=2)).isoformat() + "Z", "Multiple SSH Login Failures", "Detected multiple failed password attempts for invalid users from 198.51.100.42.", "medium", "new", "Linux Auth", "syslog", "T1110", logs_data[10][8], logs_data[10][9], None),
         (str(uuid.uuid4()), (now - timedelta(hours=5)).isoformat() + "Z", "Kerberos Service Ticket Requested Anomaly", "Unusual volume of Kerberos ticket requests for sql_admin service.", "low", "resolved", "Windows Server", "4769", "T1558.003", logs_data[5][8], logs_data[5][9], "admin"),
-        (str(uuid.uuid4()), (now - timedelta(hours=1)).isoformat() + "Z", "ADC Traffic Anomaly", "Unusually high connection duration detected on SLB Layer4 traffic across IPv6 nodes.", "medium", "investigating", "Fortinet ADC", "0100008000", "T1071.001", logs_data[-1][8], logs_data[-1][9], "readonly")
+        (str(uuid.uuid4()), (now - timedelta(hours=1)).isoformat() + "Z", "ADC Traffic Anomaly", "Unusually high connection duration detected on SLB Layer4 traffic across IPv6 nodes.", "medium", "investigating", "Fortinet ADC", "0100008000", "T1071.001", logs_data[-1][8], logs_data[-1][9], "readonly"),
+        (str(uuid.uuid4()), (now - timedelta(minutes=45)).isoformat() + "Z", "CrowdStrike: Credential Dumping Detected", "Falcon sensor blocked lsass.exe memory dumping attempt.", "critical", "new", "CrowdStrike Falcon", "DetectionSummaryEvent", "T1003.001", logs_data[-16][8], logs_data[-16][9], None),
+        (str(uuid.uuid4()), (now - timedelta(hours=3)).isoformat() + "Z", "DLP: PCI Data Exfiltration Blocked", "Symantec DLP blocked an attempt to upload customer_data.csv containing credit card numbers.", "high", "new", "Symantec DLP", "Incident", "T1048.003", logs_data[-2][8], logs_data[-2][9], "admin")
     ]
     cursor.executemany("""
         INSERT INTO alerts (id, timestamp, title, description, severity, status, source, event_id, mitre_ref, raw_log, extracted_fields, assigned_to)
@@ -269,7 +290,9 @@ def _seed_sample_data(cursor):
         (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiWeb: Expired Certificate", "Detects local certificate expiration events on FortiWeb WAF to prevent service disruption.", "match", "0003000200", "T1587.004", None, "critical", 1, '{"field": "msg", "operator": "contains", "value": "expired"}'),
         (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiGate: Nmap WebDAV Scan", "Detects automated Nmap WebDAV authentication bypass vulnerability scanning attempts.", "match", "99999", "T1190", None, "high", 1, '{"field": "agent", "operator": "contains", "value": "Nmap"}'),
         (f"UC-{str(uuid.uuid4())[:8].upper()}", "Windows: Kerberos Ticket Anomalies", "Detects abnormal volume of Kerberos TGS requests (Event 4769).", "threshold", "4769", "T1558.003", 50, "low", 1, None),
-        (f"UC-{str(uuid.uuid4())[:8].upper()}", "Fortinet ADC: Traffic Anomaly", "Detects unusual Layer 4 load balancing traffic durations on IPv6 networks.", "threshold", "0100008000", "T1071.001", 100, "medium", 1, '{"field": "duration", "operator": ">", "value": "100"}')
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "Fortinet ADC: Traffic Anomaly", "Detects unusual Layer 4 load balancing traffic durations on IPv6 networks.", "threshold", "0100008000", "T1071.001", 100, "medium", 1, '{"field": "duration", "operator": ">", "value": "100"}'),
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "CrowdStrike: Credential Dumping", "Triggers when Falcon sensor detects LSASS memory dumping.", "match", "DetectionSummaryEvent", "T1003.001", None, "critical", 1, '{"field": "DetectName", "operator": "contains", "value": "lsass"}'),
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "DLP: PCI Exfiltration", "Triggers when DLP blocks PCI credit card data transfer to unauthorized locations.", "match", "Incident", "T1048.003", None, "high", 1, '{"field": "Policy", "operator": "contains", "value": "PCI"}')
     ]
     cursor.executemany("""
         INSERT INTO use_cases (id, title, description, type, event_id, mitre_technique, threshold_count, severity, active, rule_logic)
