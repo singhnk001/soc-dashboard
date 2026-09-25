@@ -1028,37 +1028,71 @@ def purge_old_logs(days: int = Query(30, ge=1)):
 
 
 
-@app.get("/api/threat-intel")
-def get_threat_intel():
-    """Fetch Threat Intelligence from AlienVault OTX."""
+
+class FeedRequest(BaseModel):
+    name: str
+    url: str
+    type: str
+    category: str
+
+@app.get("/api/threat-feeds")
+def get_threat_feeds():
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, url, type, category, status, last_updated, indicator_count FROM threat_feeds")
+        feeds = [{"id": r[0], "name": r[1], "url": r[2], "type": r[3], "category": r[4], "status": r[5], "last_updated": r[6], "indicator_count": r[7]} for r in cursor.fetchall()]
+        return {"data": feeds}
+
+@app.post("/api/threat-feeds")
+def add_threat_feed(req: FeedRequest):
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        feed_id = str(uuid.uuid4())
+        cursor.execute("INSERT INTO threat_feeds (id, name, url, type, category, status, indicator_count) VALUES (?, ?, ?, ?, ?, 'Active', 0)", (feed_id, req.name, req.url, req.type, req.category))
+        conn.commit()
+        return {"status": "success", "id": feed_id}
+
+@app.post("/api/threat-feeds/{feed_id}/sync")
+def sync_feed(feed_id: str):
     import urllib.request
     import csv
     from io import StringIO
+    from datetime import datetime
     
-    url = "https://otx.alienvault.com/otxapi/pulses/6a3407d69c9a31c90e0debe2/export/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IlNJTkdITkswMDEiLCJ2YWx1ZSI6WyI2YTM0MDdkNjljOWEzMWM5MGUwZGViZTIiLCJjc3YiXSwiZXhwIjoxNzkwNDU1OTY4fQ.W073M-1h5Jx10LfkftEhX6hvwe3YjFzdrdvvBCukumM&format=csv"
-    
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response = urllib.request.urlopen(req).read().decode('utf-8')
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT url FROM threat_feeds WHERE id = ?", (feed_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Feed not found")
         
-        # Parse CSV
-        f = StringIO(response)
-        reader = csv.DictReader(f)
+        url = row[0]
         
-        results = []
-        for row in reader:
-            # Clean keys since CSV has BOM or weird quotes sometimes
-            clean_row = {k.strip().replace('"', ''): v.strip().replace('"', '') for k, v in row.items()}
-            # Keys expected: Indicator type, Indicator, Description
-            results.append({
-                "type": clean_row.get('Indicator type', 'Unknown'),
-                "indicator": clean_row.get('Indicator', ''),
-                "description": clean_row.get('Description', '')
-            })
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            response = urllib.request.urlopen(req).read().decode('utf-8')
             
-        return {"status": "success", "count": len(results), "data": results}
-    except Exception as e:
-        return {"status": "error", "message": str(e), "data": []}
+            f = StringIO(response)
+            reader = csv.DictReader(f)
+            count = len(list(reader))
+            
+            now = datetime.utcnow().isoformat() + "Z"
+            cursor.execute("UPDATE threat_feeds SET indicator_count = ?, last_updated = ? WHERE id = ?", (count, now, feed_id))
+            conn.commit()
+            
+            return {"status": "success", "count": count, "last_updated": now}
+        except Exception as e:
+            cursor.execute("UPDATE threat_feeds SET status = ? WHERE id = ?", ("Error", feed_id))
+            conn.commit()
+            return {"status": "error", "message": str(e)}
+
+@app.delete("/api/threat-feeds/{feed_id}")
+def delete_feed(feed_id: str):
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM threat_feeds WHERE id = ?", (feed_id,))
+        conn.commit()
+        return {"status": "success"}
 
 class LoginRequest(BaseModel):
     username: str

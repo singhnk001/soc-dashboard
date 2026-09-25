@@ -1,161 +1,180 @@
 ﻿"use client";
 
-import React, { useState } from "react";
-import useSWR from "swr";
-import { Search, Settings, ChevronRight, ChevronDown } from "lucide-react";
-import { format } from "date-fns";
+import React, { useState, useEffect } from "react";
+import { ShieldAlert, Search, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+export default function ThreatIntelPage() {
+  const [feeds, setFeeds] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  const [form, setForm] = useState({
+    name: '',
+    url: '',
+    type: 'API',
+    category: 'Malware IPs'
+  });
 
-export default function ThreatIntelIntegrationPage() {
-  const { data, error, isLoading } = useSWR('/api/threat-intel', fetcher);
-  
-  const [activeTab, setActiveTab] = useState("Malware URLs");
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({"Malware URLs": true});
-  
-  const toggleCategory = (cat: string) => {
-    setExpandedCategories(prev => (Object.assign({}, prev, { [cat]: !prev[cat] })));
+  const fetchFeeds = async () => {
+    try {
+      const res = await fetch('/api/threat-feeds');
+      const data = await res.json();
+      setFeeds(data.data || []);
+     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
-  const alienVaultCount = data?.count || 1144;
-  
-  const categories = [
-    { name: "Watch Lists", sub: [] },
-    { name: "Lookup Tables", sub: [] },
-    { name: "Osquery", sub: [] },
-    { name: "Automation", sub: [] },
-    { name: "Malware Domains", sub: [] },
-    { name: "Malware IPc", sub: [] },
-    { name: "Malware Hash", sub: [] },
-    { name: "Malware Processes", sub: [] },
-    { name: "Malware URLs", sub: [
-      "ThreatStream Malware URL",
-      "FortiSandbox Malware URL",
-      "FortiGuard Malware URL",
-      "OpenPhish Malware URL",
-      "URLHaus Malware URL",
-      "TweetFeed Malware URL",
-      "ThreatFox Malware URL",
-      "MISP Malware URL"
-    ]}
-  ];
+  useEffect(() => { fetchFeeds(); }, []);
 
-  const feeds = [
-    { status: "Not Scheduled", name: "OpenPhish Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Scheduled", name: "URLHaus Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Scheduled", name: "TweetFeed Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Scheduled", name: "ThreatFox Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Configured", name: "MISP Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "MANUAL" },
-    { status: "Not Scheduled", name: "FortiRecon Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Scheduled", name: "FortiSOAR Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Scheduled", name: "OpenCTI Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Scheduled", name: "Mandiant Malware URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Not Scheduled", name: "ANY.RUN URL", indicators: "0 - 0", lastUpdated: "-", schedule: "-", type: "API" },
-    { status: "Normal", name: "AlienVault OTX", indicators: alienVaultCount.toLocaleString() + " - 9", lastUpdated: format(new Date(), "MMM dd, yyyy, hh:mm:ss a"), schedule: "Every 1 day at 00:00 AM starting 09/18/2024 and running for ever.", type: "API" },
-    { status: "Normal", name: "Urlhaus_IOC", indicators: "16,052 - 1...", lastUpdated: format(new Date(), "MMM dd, yyyy, hh:mm:ss a"), schedule: "Every 1 day at 1:35 PM starting 08/11/2026 and running for ever.", type: "API" }
-  ];
+  const handleSync = async (id: string) => {
+    await fetch(`/api/threat-feeds/${id}/sync`, { method: 'POST' });
+    fetchFeeds();
+  };
+
+  const handleDelete = async (id: string) => {
+    await fetch(`/api/threat-feeds/${id}`, { method: 'DELETE' });
+    fetchFeeds();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch('/api/threat-feeds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
+    setShowModal(false);
+    setForm({ name: '', url: '', type: 'API', category: 'Malware IPs' });
+    fetchFeeds();
+  };
+
+  const filteredFeeds = feeds.filter((f: any) => 
+    f.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="flex h-[calc(100vh-60px)] bg-[#1e1e1e] text-[#d4d4d4] font-sans">
-      
-      {/* Sidebar Navigation */}
-      <div className="w-64 border-r border-[#333] flex flex-col overflow-y-auto custom-scrollbar bg-[#252526]">
-        <div className="py-2">
-          {categories.map((category) => (
-            <div key={category.name}>
-              <div 
-                className={"flex items-center px-2 py-1.5 cursor-pointer hover:bg-[#2a2d2e] text-sm " + (activeTab === category.name ? "bg-[#37373d] font-medium" : "")}
-                onClick={() => {
-                  if (category.sub.length > 0) toggleCategory(category.name);
-                  setActiveTab(category.name);
-                }}
-              >
-                <div className="w-4 flex items-center justify-center mr-1">
-                  {category.sub.length > 0 ? (
-                    expandedCategories[category.name] ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-                  ) : <ChevronRight size={14} className="opacity-0" />}
-                </div>
-                {category.name}
-              </div>
-              
-              {category.sub.length > 0 && expandedCategories[category.name] && (
-                <div className="pl-7 py-1">
-                  {category.sub.map((subItem) => (
-                    <div 
-                      key={subItem} 
-                      className={"px-2 py-1.5 text-xs cursor-pointer hover:bg-[#2a2d2e] " + (activeTab === subItem ? "bg-[#094771] text-white rounded-sm" : "text-[#cccccc]")}
-                      onClick={() => setActiveTab(subItem)}
-                    >
-                      {subItem}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+    <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+            <ShieldAlert className="text-red-500" />
+            Threat Intelligence Feeds
+          </h1>
+          <p className="text-gray-400">Manage and sync external IoC feeds for detection</p>
         </div>
+        
+        <button 
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
+        >
+          <Plus size={16} /> Add Threat Feed
+        </button>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col bg-[#1e1e1e]">
-        {/* Top Action Bar */}
-        <div className="flex items-center justify-between p-3 border-b border-[#333] bg-[#252526]">
-          <div className="flex items-center gap-4 w-full">
-            <div className="relative max-w-xs w-full">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-              <input 
-                type="text" 
-                className="w-full bg-[#3c3c3c] border border-[#3c3c3c] rounded-sm pl-8 pr-12 py-1 text-xs text-white focus:outline-none focus:border-[#007acc]"
-                placeholder=""
-              />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">(15/15)</span>
-            </div>
-            
-            <button className="flex items-center gap-1.5 px-3 py-1 bg-[#3c3c3c] hover:bg-[#4d4d4d] border border-transparent rounded-sm text-xs transition-colors">
-              <Settings size={14} />
-              Actions
-              <ChevronDown size={12} className="ml-1" />
-            </button>
+      <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg overflow-hidden flex flex-col h-[600px]">
+        <div className="p-4 border-b border-gray-800 flex gap-4 bg-[#11141e]">
+          <div className="relative flex-grow max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            <input 
+              type="text"
+              placeholder="Search feeds..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+            />
           </div>
-          <div className="text-[#cccccc] text-xs font-semibold px-4">{activeTab} Integration Status</div>
         </div>
 
-        {/* Data Table */}
-        <div className="flex-1 overflow-auto custom-scrollbar">
-          <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead className="bg-[#1e1e1e] sticky top-0 border-b border-[#333] z-10">
-              <tr className="text-[#cccccc] font-semibold">
-                <th className="px-4 py-2 font-semibold">Status</th>
-                <th className="px-4 py-2 font-semibold">Feed</th>
-                <th className="px-4 py-2 font-semibold">Indicators</th>
-                <th className="px-4 py-2 font-semibold">Last Updated</th>
-                <th className="px-4 py-2 font-semibold">Pulling Schedule</th>
-                <th className="px-4 py-2 font-semibold">Integration Type</th>
+        <div className="flex-grow overflow-auto">
+          <table className="w-full text-left text-sm text-gray-300">
+            <thead className="bg-[#11141e] text-gray-400 sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-3 font-medium border-b border-gray-800">Feed Name</th>
+                <th className="px-6 py-3 font-medium border-b border-gray-800">Type</th>
+                <th className="px-6 py-3 font-medium border-b border-gray-800">Status</th>
+                <th className="px-6 py-3 font-medium border-b border-gray-800">Indicators</th>
+                <th className="px-6 py-3 font-medium border-b border-gray-800">Last Sync</th>
+                <th className="px-6 py-3 font-medium border-b border-gray-800 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#333]">
-              {feeds.map((feed, idx) => (
-                <tr key={idx} className={"hover:bg-[#2a2d2e] " + (idx % 2 === 0 ? "bg-[#1e1e1e]" : "bg-[#252526]")}>
-                  <td className="px-4 py-1.5">
-                    <span className={"inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold " + (
-                      feed.status === 'Normal' ? "bg-[#1b5e20] text-[#a5d6a7]" : 
-                      feed.status === 'Not Configured' ? "bg-[#424242] text-[#e0e0e0]" : 
-                      "bg-[#0d47a1] text-[#90caf9]"
+            <tbody className="divide-y divide-gray-800">
+              {filteredFeeds.map((f: any) => (
+                <tr key={f.id} className="hover:bg-gray-800/50 transition-colors">
+                  <td className="px-6 py-3 font-medium text-white">{f.name} (({f.category}))</td>
+                  <td className="px-6 py-3">{f.type}</td>
+                  <td className="px-6 py-3">
+                    <span className={"inline-flex items-center px-2 py-0.5 rounded-text-xs " + (
+                      f.status === 'Active' ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
                     )}>
-                      {feed.status}
+                      {f.status}
                     </span>
                   </td>
-                  <td className="px-4 py-1.5 text-[#e0e0e0] font-medium">{feed.name}</td>
-                  <td className="px-4 py-1.5">{feed.indicators}</td>
-                  <td className="px-4 py-1.5">{feed.lastUpdated}</td>
-                  <td className="px-4 py-1.5 text-[#a0a0a0] truncate max-w-xs">{feed.schedule}</td>
-                  <td className="px-4 py-1.5">{feed.type}</td>
+                  <td className="px-6 py-3">{f.indicator_count.toLocaleString()}</td>
+                  <td className="px-6 py-3">
+                    {f.last_updated ? formatDistanceToNow(new Date(f.last_updated)) + ' ago' : 'Never'}
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      <button onClick={() => handleSync(f.id)} className="text-blue-400 hover:text-blue-300" title="Sync Now">
+                        <RefreshCw size={18} />
+                      </button>
+                      <button onClick={() => handleDelete(f.id)} className="text-red-400 hover:text-red-300" title="Delete">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Add Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#1a1f2e] p-6 rounded-lg w-full max-w-md border border-gray-800">
+            <h2 className="text-xl font-bold text-white mb-4">Add Threat Intel Feed</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Feed Name</label>
+                <input required type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">API URL</label>
+                <input required type="url" value={form.url} onChange={e => setForm({...form, url: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Integration Type</label>
+                  <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                    <option>API</option>
+                    <option>MANUAL</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Category</label>
+                  <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                    <option>Malware IPs</option>
+                    <option>Malware URLs</option>
+                    <option>Malware Domains</option>
+                    <option>Malware Hashes</option>
+                    <option>Mixed</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 hover:bg-gray-800 rounded text-gray-300">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white">Add Feed</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+
+

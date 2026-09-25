@@ -27,8 +27,9 @@ export default function Sidebar() {
     return () => clearInterval(interval);
   }, []);
 
-  const navItems = [
+    const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Threat Intel', href: '/threat-intel', icon: ShieldAlert },
     { name: 'Sources', href: '/sources', icon: Server },
     { name: 'Logs', href: '/logs', icon: FileText },
     { name: 'Parsers', href: '/parsers', icon: Code },
