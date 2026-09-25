@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ShieldAlert, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ShieldAlert, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Server, FileSearch, Shield, Activity, Globe, Code } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function ThreatIntelPage() {
+  const [activeTab, setActiveTab] = useState<'feeds' | 'lookup'>('feeds');
   const [feeds, setFeeds] = useState<any[]>([]);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [indicators, setIndicators] = useState<Record<string, any[]>>({});
@@ -14,6 +15,13 @@ export default function ThreatIntelPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // VT Lookup State
+  const [vtInput, setVtInput] = useState("");
+  const [vtType, setVtType] = useState("IP");
+  const [vtResult, setVtResult] = useState<any>(null);
+  const [vtLoading, setVtLoading] = useState(false);
+  const [vtError, setVtError] = useState("");
   
   const [form, setForm] = useState({
     name: '',
@@ -128,28 +136,27 @@ export default function ThreatIntelPage() {
     setShowModal(false);
     fetchFeeds();
   };
-
-  const downloadCSV = (feedName: string, iocs: any[]) => {
-    if (!iocs || iocs.length === 0) return;
-    
-    const headers = ['IoC Type', 'Indicator', 'Description'];
-    const csvRows = [headers.join(',')];
-    
-    for (const ioc of iocs) {
-      const type = `"${(ioc.type || '').replace(/"/g, '""')}"`;
-      const indicator = `"${(ioc.indicator || '').replace(/"/g, '""')}"`;
-      const desc = `"${(ioc.description || '').replace(/"/g, '""')}"`;
-      csvRows.push([type, indicator, desc].join(','));
+  
+  const handleLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vtInput) return;
+    setVtLoading(true);
+    setVtError("");
+    setVtResult(null);
+    try {
+      const url = '/api/threat-intel/lookup?ioc=' + encodeURIComponent(vtInput.trim()) + '&ioc_type=' + vtType;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.status === 'success') {
+        setVtResult(data.data);
+      } else {
+        setVtError(data.message || 'Error occurred');
+      }
+    } catch(e: any) {
+      setVtError(e.message);
+    } finally {
+      setVtLoading(false);
     }
-    
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", feedName.replace(/\s+/g, '_') + "_indicators.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const filteredFeeds = feeds.filter((f: any) => 
@@ -157,165 +164,295 @@ export default function ThreatIntelPage() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-end">
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="flex justify-between items-end border-b border-gray-800 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-            <ShieldAlert className="text-red-500" />
-            Threat Intelligence Feeds
+            <ShieldAlert className="text-blue-500" />
+            Threat Intelligence Center
           </h1>
-          <p className="text-gray-400">Manage, sync, and inspect external IoC feeds for detection</p>
+          <p className="text-gray-400">Manage external IoC feeds and perform deep VirusTotal investigations</p>
         </div>
-        
-        <button 
-          onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
-        >
-          <Plus size={16} /> Add Threat Feed
-        </button>
+        <div className="flex bg-[#11141e] rounded-lg p-1 border border-gray-800">
+          <button 
+            onClick={() => setActiveTab('feeds')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === 'feeds' ? 'bg-[#1a1f2e] text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            <Server size={16} /> Threat Feeds
+          </button>
+          <button 
+            onClick={() => setActiveTab('lookup')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === 'lookup' ? 'bg-[#1a1f2e] text-blue-400 shadow' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            <FileSearch size={16} /> IoC Lookup
+          </button>
+        </div>
       </div>
 
-      <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg overflow-hidden flex flex-col h-[700px]">
-        <div className="p-4 border-b border-gray-800 flex gap-4 bg-[#11141e]">
-          <div className="relative flex-grow max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-            <input 
-              type="text"
-              placeholder="Search feeds..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            />
+      {activeTab === 'feeds' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex justify-between items-center">
+            <div className="relative w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              <input 
+                type="text"
+                placeholder="Search threat feeds..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-[#11141e] border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors shadow-inner"
+              />
+            </div>
+            <button 
+              onClick={openAddModal}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-lg shadow-blue-900/20"
+            >
+              <Plus size={18} /> Configure Feed
+            </button>
+          </div>
+
+          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
+            <div className="overflow-auto custom-scrollbar" style={{maxHeight: '600px'}}>
+              <table className="w-full text-left text-sm text-gray-300">
+                <thead className="bg-[#11141e] text-gray-400 sticky top-0 z-10 shadow-sm border-b border-gray-800">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold w-8"></th>
+                    <th className="px-6 py-4 font-semibold">Feed Name</th>
+                    <th className="px-6 py-4 font-semibold">Type</th>
+                    <th className="px-6 py-4 font-semibold">Status</th>
+                    <th className="px-6 py-4 font-semibold">Indicators</th>
+                    <th className="px-6 py-4 font-semibold">Schedule</th>
+                    <th className="px-6 py-4 font-semibold">Last Sync</th>
+                    <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/50">
+                  {filteredFeeds.map((f: any) => (
+                    <React.Fragment key={f.id}>
+                      <tr className={"hover:bg-[#1f2537] transition-colors group " + (expandedRows.has(f.id) ? "bg-[#1f2537]" : "")}>
+                        <td className="px-4 py-4 cursor-pointer text-gray-500 group-hover:text-blue-400" onClick={() => toggleRow(f.id)}>
+                          {expandedRows.has(f.id) ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
+                        </td>
+                        <td className="px-6 py-4 cursor-pointer" onClick={() => toggleRow(f.id)}>
+                          <div className="font-medium text-white">{f.name}</div>
+                          <div className="text-xs text-gray-500 mt-1">{f.category}</div>
+                        </td>
+                        <td className="px-6 py-4"><span className="text-gray-400 bg-gray-800/50 px-2 py-1 rounded text-xs">{f.type}</span></td>
+                        <td className="px-6 py-4">
+                          <div className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border " + (
+                            f.status === 'Active' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                          )}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${f.status === 'Active' ? 'bg-emerald-400' : 'bg-rose-400'}`}></div>
+                            {f.status}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-gray-400">{(f.indicator_count || 0).toLocaleString()}</td>
+                        <td className="px-6 py-4 text-gray-400">{f.schedule}</td>
+                        <td className="px-6 py-4 text-gray-400">
+                          {f.last_updated ? formatDistanceToNow(new Date(f.last_updated)) + ' ago' : 'Never'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleSync(f.id)} className="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded" title="Sync Now">
+                              <RefreshCw size={16} />
+                            </button>
+                            <button onClick={() => handleEdit(f)} className="p-1.5 text-gray-400 hover:bg-gray-700 rounded" title="Edit Feed">
+                              <Edit2 size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(f.id)} className="p-1.5 text-rose-400 hover:bg-rose-400/10 rounded" title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {expandedRows.has(f.id) && (
+                        <tr className="bg-[#11141e]">
+                          <td colSpan={8} className="p-0">
+                            <div className="px-14 py-6 border-l-2 border-blue-500">
+                              <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-gray-300 font-medium flex items-center gap-2">
+                                  <Activity size={16} className="text-blue-500"/> Previewing Top Indicators
+                                </h4>
+                                {indicators[f.id] && indicators[f.id].length > 0 && (
+                                  <button 
+                                    onClick={() => window.open('/api/threat-feeds/' + f.id + '/export', '_self')}
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-[#1a1f2e] border border-gray-700 hover:bg-gray-800 text-gray-300 rounded-md text-sm transition-colors shadow-sm"
+                                  >
+                                    <Download size={14} /> Download Full CSV
+                                  </button>
+                                )}
+                              </div>
+                              {loadingIndicators.has(f.id) ? (
+                                <div className="text-gray-500 animate-pulse py-8 text-center bg-[#1a1f2e] rounded-lg border border-gray-800 border-dashed">Extracting intelligence...</div>
+                              ) : !indicators[f.id] || indicators[f.id].length === 0 ? (
+                                <div className="text-gray-600 py-8 text-center bg-[#1a1f2e] rounded-lg border border-gray-800 border-dashed">No active indicators found. Sync the feed to pull data.</div>
+                              ) : (
+                                <div className="max-h-96 overflow-y-auto border border-gray-800 rounded-lg custom-scrollbar bg-[#1a1f2e] shadow-inner">
+                                  <table className="w-full">
+                                    <thead className="sticky top-0 bg-[#1a1f2e] shadow-sm z-10">
+                                      <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                                        <th className="px-6 py-3 font-medium w-48 text-left">IoC Type</th>
+                                        <th className="px-6 py-3 font-medium text-left">Raw Indicator</th>
+                                        <th className="px-6 py-3 font-medium text-left">Context / Description</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-800/50">
+                                      {indicators[f.id].map((ioc: any, idx: number) => (
+                                        <tr key={idx} className="hover:bg-[#23293b]">
+                                          <td className="px-6 py-2.5">
+                                            <span className="px-2 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md text-xs font-medium">
+                                              {ioc.type}
+                                            </span>
+                                          </td>
+                                          <td className="px-6 py-2.5 text-gray-300 font-mono text-sm text-left">{ioc.indicator}</td>
+                                          <td className="px-6 py-2.5 text-gray-500 text-sm text-left truncate max-w-xs" title={ioc.description}>{ioc.description || 'N/A'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="flex-grow overflow-auto">
-          <table className="w-full text-left text-sm text-gray-300">
-            <thead className="bg-[#11141e] text-gray-400 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-3 font-medium border-b border-gray-800 w-8"></th>
-                <th className="px-6 py-3 font-medium border-b border-gray-800">Feed Name</th>
-                <th className="px-6 py-3 font-medium border-b border-gray-800">Type</th>
-                <th className="px-6 py-3 font-medium border-b border-gray-800">Status</th>
-                <th className="px-6 py-3 font-medium border-b border-gray-800">Indicators</th>
-                <th className="px-6 py-3 font-medium border-b border-gray-800">Pulling Schedule</th>
-                <th className="px-6 py-3 font-medium border-b border-gray-800">Last Sync</th>
-                <th className="px-6 py-3 font-medium border-b border-gray-800 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {filteredFeeds.map((f: any) => (
-                <React.Fragment key={f.id}>
-                  <tr className={"hover:bg-gray-800/50 transition-colors " + (expandedRows.has(f.id) ? "bg-gray-800/30" : "")}>
-                    <td className="px-4 py-3 cursor-pointer" onClick={() => toggleRow(f.id)}>
-                      {expandedRows.has(f.id) ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
-                    </td>
-                    <td className="px-6 py-3 font-medium text-white cursor-pointer" onClick={() => toggleRow(f.id)}>{f.name} (({f.category}))</td>
-                    <td className="px-6 py-3">{f.type}</td>
-                    <td className="px-6 py-3">
-                      <span className={"inline-flex items-center px-2 py-0.5 rounded text-xs " + (
-                        f.status === 'Active' ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
-                      )}>
-                        {f.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">{(f.indicator_count || 0).toLocaleString()}</td>
-                    <td className="px-6 py-3">{f.schedule}</td>
-                    <td className="px-6 py-3">
-                      {f.last_updated ? formatDistanceToNow(new Date(f.last_updated)) + ' ago' : 'Never'}
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <button onClick={() => handleSync(f.id)} className="text-blue-400 hover:text-blue-300" title="Sync Now">
-                          <RefreshCw size={18} />
-                        </button>
-                        <button onClick={() => handleEdit(f)} className="text-gray-400 hover:text-gray-300" title="Edit Feed">
-                          <Edit2 size={18} />
-                        </button>
-                        <button onClick={() => handleDelete(f.id)} className="text-red-400 hover:text-red-300" title="Delete">
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedRows.has(f.id) && (
-                    <tr className="bg-[#0a0e1a]">
-                      <td colSpan={8} className="p-6">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-white font-medium">Top Indicators Extracted</h4>
-                          {indicators[f.id] && indicators[f.id].length > 0 && (
-                            <button 
-                              onClick={() => downloadCSV(f.name, indicators[f.id])}
-                              className="flex items-center gap-2 px-3 py-1 bg-[#11141e] border border-gray-700 hover:bg-gray-800 text-gray-300 rounded text-sm transition-colors"
-                            >
-                              <Download size={14} /> Export CSV
-                            </button>
-                          )}
-                        </div>
-                        {loadingIndicators.has(f.id) ? (
-                          <div className="text-gray-400 animate-pulse">Loading indicators...</div>
-                        ) : !indicators[f.id] || indicators[f.id].length === 0 ? (
-                          <div className="text-gray-500">No indicators found.</div>
-                        ) : (
-                          <div className="max-h-96 overflow-y-auto border border-gray-800 rounded-sm custom-scrollbar">
-                            <table className="w-full bg-[#11141e]">
-                              <thead className="sticky top-0 bg-[#11141e] shadow-sm z-10">
-                                <tr className="border-b border-gray-800 text-gray-400">
-                                  <th className="px-4 py-2 font-medium w-48 text-left">IoC Type</th>
-                                  <th className="px-4 py-2 font-medium text-left">Indicator</th>
-                                  <th className="px-4 py-2 font-medium text-left">Description</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-800">
-                                {indicators[f.id].map((ioc: any, idx: number) => (
-                                  <tr key={idx} className="hover:bg-gray-800/30">
-                                    <td className="px-4 py-2">
-                                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
-                                        {ioc.type}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-2 text-white font-mono text-sm text-left">{ioc.indicator}</td>
-                                    <td className="px-4 py-2 text-gray-400 text-left truncate max-w-xs" title={ioc.description}>{ioc.description}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+      {activeTab === 'lookup' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 shadow-xl">
+            <h2 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
+              <Globe className="text-indigo-400" /> Deep Indicator Lookup
+            </h2>
+            <p className="text-gray-400 text-sm mb-6">Query VirusTotal in real-time to analyze suspicious IPs, URLs, Domains, or File Hashes.</p>
+            
+            <form onSubmit={handleLookup} className="flex gap-4">
+              <select 
+                value={vtType} 
+                onChange={e => setVtType(e.target.value)}
+                className="w-40 bg-[#11141e] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-indigo-500 font-medium"
+              >
+                <option value="IP">IP Address</option>
+                <option value="Hash">File Hash</option>
+                <option value="Domain">Domain / URL</option>
+              </select>
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input 
+                  required
+                  type="text"
+                  placeholder="e.g. 8.8.8.8 or a2b3c4..."
+                  value={vtInput}
+                  onChange={e => setVtInput(e.target.value)}
+                  className="w-full bg-[#11141e] border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-indigo-500 font-mono shadow-inner"
+                />
+              </div>
+              <button 
+                type="submit"
+                disabled={vtLoading}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {vtLoading ? <RefreshCw className="animate-spin" size={18}/> : <Search size={18}/>}
+                Analyze IoC
+              </button>
+            </form>
+          </div>
+
+          {vtError && (
+            <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 p-4 rounded-xl flex items-start gap-3">
+              <ShieldAlert className="mt-0.5 flex-shrink-0" size={18} />
+              <div>
+                <h4 className="font-medium">Analysis Failed</h4>
+                <p className="text-sm opacity-80 mt-1">{vtError}</p>
+              </div>
+            </div>
+          )}
+
+          {vtResult && vtResult.attributes && (
+            <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-6 shadow-xl animate-in fade-in">
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                    {vtType === 'IP' ? <Server className="text-blue-400"/> : vtType === 'Domain' ? <Globe className="text-emerald-400"/> : <Code className="text-purple-400"/>}
+                    {vtResult.id || vtInput}
+                  </h3>
+                  <div className="flex gap-4 mt-2 text-sm text-gray-400">
+                    {vtResult.attributes.as_owner && <span>Owner: <span className="text-gray-200">{vtResult.attributes.as_owner}</span></span>}
+                    {vtResult.attributes.country && <span>Country: <span className="text-gray-200">{vtResult.attributes.country}</span></span>}
+                    {vtResult.attributes.meaningful_name && <span>File Name: <span className="text-gray-200">{vtResult.attributes.meaningful_name}</span></span>}
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <div className="text-sm text-gray-400 mb-1">Reputation Score</div>
+                  <div className={`text-3xl font-bold ${
+                    (vtResult.attributes.reputation || 0) < 0 ? 'text-rose-500' : 
+                    (vtResult.attributes.reputation || 0) > 0 ? 'text-emerald-500' : 'text-gray-300'
+                  }`}>
+                    {vtResult.attributes.reputation || 0}
+                  </div>
+                </div>
+              </div>
+
+              <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Analysis Results</h4>
+              
+              <div className="grid grid-cols-4 gap-4 mb-8">
+                <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-rose-500">{vtResult.attributes.last_analysis_stats?.malicious || 0}</div>
+                  <div className="text-xs text-rose-400 uppercase tracking-wide mt-1">Malicious</div>
+                </div>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-amber-500">{vtResult.attributes.last_analysis_stats?.suspicious || 0}</div>
+                  <div className="text-xs text-amber-400 uppercase tracking-wide mt-1">Suspicious</div>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-emerald-500">{vtResult.attributes.last_analysis_stats?.harmless || 0}</div>
+                  <div className="text-xs text-emerald-400 uppercase tracking-wide mt-1">Harmless</div>
+                </div>
+                <div className="bg-gray-700/20 border border-gray-700/50 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-gray-400">{vtResult.attributes.last_analysis_stats?.undetected || 0}</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wide mt-1">Undetected</div>
+                </div>
+              </div>
+
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#1a1f2e] p-6 rounded-lg w-full max-w-md border border-gray-800">
-            <h2 className="text-xl font-bold text-white mb-4">{editingId ? 'Edit Threat Intel Feed' : 'Add Threat Intel Feed'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-[#1a1f2e] p-8 rounded-xl w-full max-w-md border border-gray-700 shadow-2xl slide-in-from-bottom-4">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <Server className="text-blue-500" />
+              {editingId ? 'Edit Threat Intel Feed' : 'Add Threat Intel Feed'}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Feed Name</label>
-                <input required type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white" />
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Feed Name</label>
+                <input required type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 focus:outline-none transition-colors" />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">API URL</label>
-                <input required type="url" value={form.url} onChange={e => setForm({...form, url: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white" />
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">API URL</label>
+                <input required type="url" value={form.url} onChange={e => setForm({...form, url: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 focus:outline-none transition-colors" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Integration Type</label>
-                  <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Integration Type</label>
+                  <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 focus:outline-none transition-colors">
                     <option>API</option>
                     <option>MANUAL</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Category</label>
-                  <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Category</label>
+                  <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 focus:outline-none transition-colors">
                     <option>Malware IPs</option>
                     <option>Malware URLs</option>
                     <option>Malware Domains</option>
@@ -325,16 +462,16 @@ export default function ThreatIntelPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Pulling Schedule</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Pulling Schedule</label>
                 <div className="flex gap-2">
-                  <select value={form.freq} onChange={e => setForm({...form, freq: e.target.value})} className="w-1/2 bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                  <select value={form.freq} onChange={e => setForm({...form, freq: e.target.value})} className="w-1/2 bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 focus:outline-none transition-colors">
                     <option>Daily</option>
                     <option>Hourly</option>
                     <option>Weekly</option>
                     <option>Monthly</option>
                   </select>
-                  <div className="flex items-center text-gray-400">at</div>
-                  <select value={form.time} onChange={e => setForm({...form, time: e.target.value})} className="w-1/2 bg-[#0a0e1a] border border-gray-700 rounded p-2 text-white">
+                  <div className="flex items-center justify-center text-gray-500 w-8">at</div>
+                  <select value={form.time} onChange={e => setForm({...form, time: e.target.value})} className="w-1/2 bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 focus:outline-none transition-colors">
                     {Array.from({length: 24}).map((_, i) => {
                       const hour = i === 0 ? 12 : i > 12 ? i - 12 : i;
                       const ampm = i >= 12 ? 'PM' : 'AM';
@@ -344,9 +481,9 @@ export default function ThreatIntelPage() {
                   </select>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 hover:bg-gray-800 rounded text-gray-300">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white">{editingId ? 'Save Changes' : 'Add Feed'}</button>
+              <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-800">
+                <button type="button" onClick={() => setShowModal(false)} className="px-5 py-2.5 hover:bg-gray-800 rounded-lg text-gray-300 font-medium transition-colors">Cancel</button>
+                <button type="submit" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium shadow-lg shadow-blue-900/20 transition-colors">{editingId ? 'Save Changes' : 'Add Feed'}</button>
               </div>
             </form>
           </div>

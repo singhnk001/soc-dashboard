@@ -1098,6 +1098,32 @@ def add_threat_feed(req: FeedRequest):
         conn.commit()
         return {"status": "success", "id": feed_id}
 
+@app.get("/api/threat-feeds/{feed_id}/export")
+def export_feed(feed_id: str):
+    import io
+    import csv
+    from fastapi.responses import StreamingResponse
+    
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM threat_feeds WHERE id = ?", (feed_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Feed not found")
+        feed_name = row[0]
+        
+        cursor.execute("SELECT type, indicator, description FROM threat_indicators WHERE feed_id = ?", (feed_id,))
+        rows = cursor.fetchall()
+        
+        output = io.StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+        writer.writerow(["IoC Type", "Indicator", "Description"])
+        writer.writerows(rows)
+        
+        response = StreamingResponse(iter([output.getvalue()]), media_type="text/csv")
+        response.headers["Content-Disposition"] = f"attachment; filename={feed_name.replace(' ', '_')}_indicators.csv"
+        return response
+
 @app.get("/api/threat-feeds/{feed_id}/indicators")
 def get_feed_indicators(feed_id: str):
     with sqlite3.connect("soc_dashboard.db") as conn:
@@ -1258,3 +1284,33 @@ def delete_user(user_id: str):
     conn.commit()
     conn.close()
     return {"success": True}
+
+@app.get("/api/threat-intel/lookup")
+def vt_lookup(ioc: str, ioc_type: str):
+    vt_key = os.environ.get("VIRUSTOTAL_API_KEY")
+    if not vt_key:
+        raise HTTPException(status_code=500, detail="VirusTotal API key not configured")
+    
+    headers = {"x-apikey": vt_key}
+    
+    try:
+        if ioc_type.lower() == "ip":
+            url = f"https://www.virustotal.com/api/v3/ip_addresses/{ioc}"
+        elif ioc_type.lower() in ["hash", "file", "filehash-sha256", "filehash-md5", "filehash-sha1"]:
+            url = f"https://www.virustotal.com/api/v3/files/{ioc}"
+        elif ioc_type.lower() in ["domain", "url"]:
+            # Basic sanitization for URLs to just extract domain or submit as URL (VT v3 urls requires base64 encoding, so we will stick to domains if possible, or just treat it as domain)
+            url = f"https://www.virustotal.com/api/v3/domains/{ioc}"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid IoC type")
+            
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return {"status": "success", "data": data.get("data", {})}
+        elif response.status_code == 404:
+            return {"status": "not_found", "message": "IoC not found in VirusTotal"}
+        else:
+            return {"status": "error", "message": f"VirusTotal API error: {response.status_code}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
