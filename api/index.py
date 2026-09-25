@@ -196,16 +196,16 @@ def _seed_sample_data(cursor):
     logs_data = []
     
     users = ["admin", "root", "jsmith", "sysadmin", "postgres", "db_service", "Guest"]
-    ips = ["192.168.1.50", "10.0.19.57", "172.16.0.5", "198.51.100.42", "10.0.50.100", "8.8.8.8"]
+    ips = ["192.168.1.50", "192.168.1.100", "172.16.0.5", "198.51.100.42", "10.0.50.100", "8.8.8.8"]
     
     # 1. FortiGate IPS Logs (Medium/High)
     for i in range(30):
         t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
         src_ip = random.choice(ips)
         dst_ip = random.choice(ips)
-        raw = f'<185>date={t.strftime("%Y-%m-%d")} time={t.strftime("%H:%M:%S")} devname="FW-CORE-01" devid="FGVMX00000000000" eventtime={int(t.timestamp()*1000000000)} tz="+0530" logid="0419016384" type="utm" subtype="ips" eventtype="signature" level="alert" vd="root" severity="medium" srcip={src_ip} srccountry="India" dstip={dst_ip} dstcountry="Reserved" srcintf="port2" srcintfrole="undefined" dstintf="DMZ-WEB" dstintfrole="lan" sessionid=1616798053 action="detected" proto=6 service="HTTP" policyid=158 poluuid="6b6363ca-abd0-51ee-6948-804c9eb73216" policytype="policy" attack="MS.IIS.WebDAV.Authentication.Bypass" srcport={random.randint(1024, 65535)} dstport=443 hostname="uat.example.com" url="/" agent="Mozilla/5.0 (compatible; Nmap Scripting Engine; https://nmap.org/book/nse.html)" httpmethod="PROPFIND" direction="outgoing" attackid=17445 profile="Corporate_IPS_Policy" ref=http://www.fortinet.com/ids/VID17445 incidentserialno=323087043 msg="web_server: MS.IIS.WebDAV.Authentication.Bypass" crscore=10 craction=16384 crlevel="medium"'
+        raw = f'<185>date={t.strftime("%Y-%m-%d")} time={t.strftime("%H:%M:%S")} devname="FW-CORE-01" devid="FGVMX00000000000" eventtime={int(t.timestamp()*1000000000)} tz="+0530" logid="0419016384" type="utm" subtype="ips" eventtype="signature" level="alert" vd="root" severity="medium" srcip={src_ip} srccountry="India" dstip={dst_ip} dstcountry="Reserved" srcintf="port2" srcintfrole="undefined" dstintf="DMZ-WEB" dstintfrole="lan" sessionid=1616798053 action="detected" proto=6 service="HTTP" policyid=158 poluuid="6b6363ca-abd0-51ee-6948-804c9eb73216" policytype="policy" attack="MS.IIS.WebDAV.Authentication.Bypass" srcport={random.randint(1024, 65535)} dstport=443 hostname="uat.example.com" url="/" agent="Mozilla/5.0 (compatible; Nmap Scripting Engine; https://nmap.org/book/nse.html)" httpmethod="PROPFIND" direction="outgoing" attackid=99999 profile="Corporate_IPS_Policy" ref=http://www.fortinet.com/ids/VID99999 incidentserialno=123456789 msg="web_server: MS.IIS.WebDAV.Authentication.Bypass" crscore=10 craction=16384 crlevel="medium"'
         extracted = json.dumps({"srcip": src_ip, "dstip": dst_ip, "attack": "MS.IIS.WebDAV.Authentication.Bypass", "action": "detected", "agent": "Nmap Scripting Engine"})
-        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "FortiGate Firewall", "17445", "medium", "web_server: MS.IIS.WebDAV.Authentication.Bypass", "FW-CORE-01", None, raw, extracted))
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "FortiGate Firewall", "99999", "medium", "web_server: MS.IIS.WebDAV.Authentication.Bypass", "FW-CORE-01", None, raw, extracted))
 
     # 2. FortiWeb WAF Critical Event
     for i in range(15):
@@ -219,9 +219,9 @@ def _seed_sample_data(cursor):
         t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
         user = random.choice(users)
         src_ip = random.choice(ips)
-        raw = f'2026-05-13T20:57:29Z ad-server-02 10.0.19.57 FSM-WUA-WinLog-Security [phCustId]="2009" [customer]="BEST" [monitorStatus]="Success" [Locale]="en-US" [MachineGuid]="00000000-0000-0000-0000-000000000000" [timeZone]="+0530" [extEventRecvProto]="Windows Agent" [level]="Information" [xml]=<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-a5ba-3e3b0328c30d}}"/><EventID>4769</EventID><Version>2</Version><Level>0</Level><Task>14337</Task><Opcode>0</Opcode><Keywords>0x8020000000000000</Keywords><TimeCreated SystemTime="{t.isoformat()}Z"/><EventRecordID>14531113</EventRecordID><Correlation/><Execution ProcessID="856" ThreadID="6540"/><Channel>Security</Channel><Computer>btad-server-02.corp.com</Computer><Security/></System><EventData><Data Name="TargetUserName">{user}</Data><Data Name="TargetDomainName">CORP.LOCAL</Data><Data Name="ServiceName">sql_admin</Data><Data Name="IpAddress">::ffff:{src_ip}</Data></EventData></Event>'
+        raw = f'2026-05-13T20:57:29Z ad-server-02 192.168.1.100 FSM-WUA-WinLog-Security [phCustId]="0000" [customer]="ACME" [monitorStatus]="Success" [Locale]="en-US" [MachineGuid]="00000000-0000-0000-0000-000000000000" [timeZone]="+0530" [extEventRecvProto]="Windows Agent" [level]="Information" [xml]=<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing" Guid="{{54849625-5478-4994-a5ba-3e3b0328c30d}}"/><EventID>4769</EventID><Version>2</Version><Level>0</Level><Task>14337</Task><Opcode>0</Opcode><Keywords>0x8020000000000000</Keywords><TimeCreated SystemTime="{t.isoformat()}Z"/><EventRecordID>14531113</EventRecordID><Correlation/><Execution ProcessID="856" ThreadID="6540"/><Channel>Security</Channel><Computer>dc-01.corp.com</Computer><Security/></System><EventData><Data Name="TargetUserName">{user}</Data><Data Name="TargetDomainName">CORP.LOCAL</Data><Data Name="ServiceName">sql_admin</Data><Data Name="IpAddress">::ffff:{src_ip}</Data></EventData></Event>'
         extracted = json.dumps({"TargetUserName": user, "IpAddress": src_ip, "EventID": "4769", "ServiceName": "sql_admin"})
-        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Windows Server", "4769", "info", f"Kerberos service ticket requested for {user}", "btad-server-02", user, raw, extracted))
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Windows Server", "4769", "info", f"Kerberos service ticket requested for {user}", "dc-01", user, raw, extracted))
 
     # 4. Linux Syslog Auth Failures
     for i in range(25):
@@ -243,7 +243,7 @@ def _seed_sample_data(cursor):
     # Sample Alerts covering all severities
     alerts_data = [
         (str(uuid.uuid4()), (now - timedelta(minutes=5)).isoformat() + "Z", "Certificate Expiration Warning", "Local certificate test23 is expired on WAF!! This may cause HTTPS traffic failures.", "critical", "new", "FortiWeb WAF", "0003000200", "T1587.004", logs_data[-1][8], logs_data[-1][9], None),
-        (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "WebDAV Authentication Bypass Attempt", "Nmap Scripting Engine detected attempting MS.IIS.WebDAV.Authentication.Bypass vulnerability.", "high", "investigating", "FortiGate Firewall", "17445", "T1190", logs_data[-2][8], logs_data[-2][9], "admin"),
+        (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "WebDAV Authentication Bypass Attempt", "Nmap Scripting Engine detected attempting MS.IIS.WebDAV.Authentication.Bypass vulnerability.", "high", "investigating", "FortiGate Firewall", "99999", "T1190", logs_data[-2][8], logs_data[-2][9], "admin"),
         (str(uuid.uuid4()), (now - timedelta(hours=2)).isoformat() + "Z", "Multiple SSH Login Failures", "Detected multiple failed password attempts for invalid users from 198.51.100.42.", "medium", "new", "Linux Auth", "syslog", "T1110", logs_data[10][8], logs_data[10][9], None),
         (str(uuid.uuid4()), (now - timedelta(hours=5)).isoformat() + "Z", "Kerberos Service Ticket Requested Anomaly", "Unusual volume of Kerberos ticket requests for sql_admin service.", "low", "resolved", "Windows Server", "4769", "T1558.003", logs_data[5][8], logs_data[5][9], "admin")
     ]
@@ -255,7 +255,7 @@ def _seed_sample_data(cursor):
     # Use Cases supporting these alerts
     uc_data = [
         (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiWeb: Expired Certificate", "Detects local certificate expiration events on FortiWeb WAF to prevent service disruption.", "match", "0003000200", "T1587.004", None, "critical", 1, '{"field": "msg", "operator": "contains", "value": "expired"}'),
-        (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiGate: Nmap WebDAV Scan", "Detects automated Nmap WebDAV authentication bypass vulnerability scanning attempts.", "match", "17445", "T1190", None, "high", 1, '{"field": "agent", "operator": "contains", "value": "Nmap"}'),
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiGate: Nmap WebDAV Scan", "Detects automated Nmap WebDAV authentication bypass vulnerability scanning attempts.", "match", "99999", "T1190", None, "high", 1, '{"field": "agent", "operator": "contains", "value": "Nmap"}'),
         (f"UC-{str(uuid.uuid4())[:8].upper()}", "Windows: Kerberos Ticket Anomalies", "Detects abnormal volume of Kerberos TGS requests (Event 4769).", "threshold", "4769", "T1558.003", 50, "low", 1, None)
     ]
     cursor.executemany("""
