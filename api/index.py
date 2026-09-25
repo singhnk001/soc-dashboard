@@ -232,6 +232,17 @@ def _seed_sample_data(cursor):
         extracted = json.dumps({"user": user, "src_ip": src_ip, "port": str(random.randint(1024, 65535)), "process": "sshd"})
         logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Linux Auth", "syslog", "low", f"Failed password for invalid user {user}", "ubuntu-web01", user, raw, extracted))
 
+    # 5. Fortinet ADC Traffic Logs (Information)
+    for i in range(20):
+        t = now - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 60))
+        duration = random.randint(5, 120)
+        ibytes = random.randint(100, 5000)
+        obytes = random.randint(100, 5000)
+        src_port = random.randint(1024, 65535)
+        raw = f'<6>date={t.strftime("%Y-%m-%d")} time={t.strftime("%H:%M:%S")},devname=ADC-EDGE-01,device_id=FADVX000000000,log_id=0100008000,type=traffic,subtype=slb_layer4,pri=information,vd=root,msg_id=11732454543,duration={duration},ibytes={ibytes},obytes={obytes},proto=6,service="tcp",src="fc00:0:1::2",src_port={src_port},dst="fd00:0:2::5306",dst_port=4060,trans_src="fc00:0:1::2",trans_src_port={src_port},trans_dst="fd00:0:2::5302",trans_dst_port=4060,policy="WEB_VIP_4060",action="none",srccountry="Reserved",dstcountry="Reserved",real_server="WEB_NODE_{random.randint(1,5)}"'
+        extracted = json.dumps({"src": "fc00:0:1::2", "dst": "fd00:0:2::5306", "service": "tcp", "policy": "WEB_VIP_4060", "duration": duration, "ibytes": ibytes})
+        logs_data.append((str(uuid.uuid4()), t.isoformat() + "Z", "Fortinet ADC", "0100008000", "info", f"SLB Layer4 Traffic routed to WEB_NODE_{random.randint(1,5)}", "ADC-EDGE-01", None, raw, extracted))
+
     # Sort logs chronologically to be realistic
     logs_data.sort(key=lambda x: x[1])
 
@@ -245,7 +256,8 @@ def _seed_sample_data(cursor):
         (str(uuid.uuid4()), (now - timedelta(minutes=5)).isoformat() + "Z", "Certificate Expiration Warning", "Local certificate test23 is expired on WAF!! This may cause HTTPS traffic failures.", "critical", "new", "FortiWeb WAF", "0003000200", "T1587.004", logs_data[-1][8], logs_data[-1][9], None),
         (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "WebDAV Authentication Bypass Attempt", "Nmap Scripting Engine detected attempting MS.IIS.WebDAV.Authentication.Bypass vulnerability.", "high", "investigating", "FortiGate Firewall", "99999", "T1190", logs_data[-2][8], logs_data[-2][9], "admin"),
         (str(uuid.uuid4()), (now - timedelta(hours=2)).isoformat() + "Z", "Multiple SSH Login Failures", "Detected multiple failed password attempts for invalid users from 198.51.100.42.", "medium", "new", "Linux Auth", "syslog", "T1110", logs_data[10][8], logs_data[10][9], None),
-        (str(uuid.uuid4()), (now - timedelta(hours=5)).isoformat() + "Z", "Kerberos Service Ticket Requested Anomaly", "Unusual volume of Kerberos ticket requests for sql_admin service.", "low", "resolved", "Windows Server", "4769", "T1558.003", logs_data[5][8], logs_data[5][9], "admin")
+        (str(uuid.uuid4()), (now - timedelta(hours=5)).isoformat() + "Z", "Kerberos Service Ticket Requested Anomaly", "Unusual volume of Kerberos ticket requests for sql_admin service.", "low", "resolved", "Windows Server", "4769", "T1558.003", logs_data[5][8], logs_data[5][9], "admin"),
+        (str(uuid.uuid4()), (now - timedelta(hours=1)).isoformat() + "Z", "ADC Traffic Anomaly", "Unusually high connection duration detected on SLB Layer4 traffic across IPv6 nodes.", "medium", "investigating", "Fortinet ADC", "0100008000", "T1071.001", logs_data[-1][8], logs_data[-1][9], "readonly")
     ]
     cursor.executemany("""
         INSERT INTO alerts (id, timestamp, title, description, severity, status, source, event_id, mitre_ref, raw_log, extracted_fields, assigned_to)
@@ -256,7 +268,8 @@ def _seed_sample_data(cursor):
     uc_data = [
         (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiWeb: Expired Certificate", "Detects local certificate expiration events on FortiWeb WAF to prevent service disruption.", "match", "0003000200", "T1587.004", None, "critical", 1, '{"field": "msg", "operator": "contains", "value": "expired"}'),
         (f"UC-{str(uuid.uuid4())[:8].upper()}", "FortiGate: Nmap WebDAV Scan", "Detects automated Nmap WebDAV authentication bypass vulnerability scanning attempts.", "match", "99999", "T1190", None, "high", 1, '{"field": "agent", "operator": "contains", "value": "Nmap"}'),
-        (f"UC-{str(uuid.uuid4())[:8].upper()}", "Windows: Kerberos Ticket Anomalies", "Detects abnormal volume of Kerberos TGS requests (Event 4769).", "threshold", "4769", "T1558.003", 50, "low", 1, None)
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "Windows: Kerberos Ticket Anomalies", "Detects abnormal volume of Kerberos TGS requests (Event 4769).", "threshold", "4769", "T1558.003", 50, "low", 1, None),
+        (f"UC-{str(uuid.uuid4())[:8].upper()}", "Fortinet ADC: Traffic Anomaly", "Detects unusual Layer 4 load balancing traffic durations on IPv6 networks.", "threshold", "0100008000", "T1071.001", 100, "medium", 1, '{"field": "duration", "operator": ">", "value": "100"}')
     ]
     cursor.executemany("""
         INSERT INTO use_cases (id, title, description, type, event_id, mitre_technique, threshold_count, severity, active, rule_logic)
