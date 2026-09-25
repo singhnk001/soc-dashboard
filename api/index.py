@@ -168,8 +168,8 @@ def init_db():
     # Seed default users
     count_u = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if count_u == 0:
-        cursor.execute("INSERT INTO users (id, username, password, role, real_name, status) VALUES (?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), 'admin', 'Password@123', 'admin', 'Administrator', 'Active'))
-        cursor.execute("INSERT INTO users (id, username, password, role, real_name, status) VALUES (?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), 'readonly', 'readonly123', 'readonly', 'Read Only User', 'Active'))
+        cursor.execute("INSERT INTO users (id, username, password, role, real_name, status) VALUES (?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), 'admin', 'Singhnk.001k', 'admin', 'Administrator', 'Active'))
+        cursor.execute("INSERT INTO users (id, username, password, role, real_name, status) VALUES (?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), 'readonly', 'readonly@123', 'readonly', 'Read Only User', 'Active'))
 
     count_uc = cursor.execute("SELECT COUNT(*) FROM use_cases").fetchone()[0]
     if count_uc == 0:
