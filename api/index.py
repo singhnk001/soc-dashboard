@@ -1412,13 +1412,19 @@ def threat_lookup(ioc: str, ioc_type: str, provider: str = "VirusTotal"):
         return {"status": "error", "message": str(e)}
 
 
+
 @app.get("/api/settings")
 def get_settings():
+    import os
     with sqlite3.connect("soc_dashboard.db") as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value FROM settings")
         rows = cursor.fetchall()
         settings = {k: v for k, v in rows}
+        
+        # Merge with env if not in db
+        if "VIRUSTOTAL_API_KEY" not in settings and os.environ.get("VIRUSTOTAL_API_KEY"):
+            settings["VIRUSTOTAL_API_KEY"] = os.environ.get("VIRUSTOTAL_API_KEY")
         
         # Mask keys for frontend
         masked = {}
@@ -1431,12 +1437,13 @@ def get_settings():
                 masked[k] = ""
         return {"status": "success", "data": masked}
 
+
 @app.post("/api/settings")
 def save_settings(payload: dict):
     with sqlite3.connect("soc_dashboard.db") as conn:
         cursor = conn.cursor()
         for k, v in payload.items():
-            if v and not v.startswith("***"): # Only update if it's a new real value, not a masked one
+            if v and "***" not in v: # Only update if it's a new real value, not a masked one
                 cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
         conn.commit()
         return {"status": "success"}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ShieldAlert, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Server, FileSearch, Globe, Code, Settings } from "lucide-react";
+import { ShieldAlert, Check, X, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Server, FileSearch, Globe, Code, Settings } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function ThreatIntelPage() {
@@ -478,29 +478,64 @@ export default function ThreatIntelPage() {
         </div>
       )}
 
+      
       {showSettings && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
           <div className="bg-[#1a1f2e] p-8 rounded-xl w-full max-w-lg border border-gray-700 shadow-2xl slide-in-from-bottom-4">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Settings className="text-indigo-400" /> API Settings
             </h2>
-            <form onSubmit={handleSaveSettings} className="space-y-5">
+            <form onSubmit={handleSaveSettings} className="space-y-6">
+              
+              {/* VirusTotal */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">VirusTotal API Key</label>
-                <input type="text" placeholder={apiKeys.VIRUSTOTAL_API_KEY} onChange={e => setApiKeys({...apiKeys, VIRUSTOTAL_API_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+                <label className="block text-sm font-medium text-gray-300 mb-2">VirusTotal API Key</label>
+                {apiKeys.VIRUSTOTAL_API_KEY && !apiKeys.VIRUSTOTAL_API_KEY.includes('***Edit') ? (
+                  <div className="flex items-center justify-between bg-[#11141e] border border-emerald-500/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                      <Check size={16} /> Configured ({apiKeys.VIRUSTOTAL_API_KEY})
+                    </div>
+                    <button type="button" onClick={() => setApiKeys({...apiKeys, VIRUSTOTAL_API_KEY: ''})} className="text-gray-400 hover:text-white text-xs underline">Edit</button>
+                  </div>
+                ) : (
+                  <input type="text" placeholder="Enter API Key..." value={apiKeys.VIRUSTOTAL_API_KEY} onChange={e => setApiKeys({...apiKeys, VIRUSTOTAL_API_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+                )}
               </div>
+              
+              {/* IBM X-Force */}
               <div className="pt-4 border-t border-gray-800">
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">IBM X-Force Key</label>
-                <input type="text" placeholder={apiKeys.IBM_XFORCE_KEY} onChange={e => setApiKeys({...apiKeys, IBM_XFORCE_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm mb-3" />
-                
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">IBM X-Force Password</label>
-                <input type="password" placeholder={apiKeys.IBM_XFORCE_PASS ? '********' : ''} onChange={e => setApiKeys({...apiKeys, IBM_XFORCE_PASS: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+                <label className="block text-sm font-medium text-gray-300 mb-2">IBM X-Force Credentials</label>
+                {apiKeys.IBM_XFORCE_KEY && !apiKeys.IBM_XFORCE_KEY.includes('***Edit') ? (
+                  <div className="flex items-center justify-between bg-[#11141e] border border-emerald-500/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                      <Check size={16} /> Configured ({apiKeys.IBM_XFORCE_KEY})
+                    </div>
+                    <button type="button" onClick={() => setApiKeys({...apiKeys, IBM_XFORCE_KEY: '', IBM_XFORCE_PASS: ''})} className="text-gray-400 hover:text-white text-xs underline">Edit</button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <input type="text" placeholder="API Key" value={apiKeys.IBM_XFORCE_KEY} onChange={e => setApiKeys({...apiKeys, IBM_XFORCE_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+                    <input type="password" placeholder="API Password" value={apiKeys.IBM_XFORCE_PASS} onChange={e => setApiKeys({...apiKeys, IBM_XFORCE_PASS: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+                  </div>
+                )}
               </div>
+              
+              {/* Cisco Talos */}
               <div className="pt-4 border-t border-gray-800">
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Cisco Talos API Key</label>
-                <input type="text" placeholder={apiKeys.CISCO_TALOS_KEY} onChange={e => setApiKeys({...apiKeys, CISCO_TALOS_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+                <label className="block text-sm font-medium text-gray-300 mb-2">Cisco Talos API Key</label>
+                {apiKeys.CISCO_TALOS_KEY && !apiKeys.CISCO_TALOS_KEY.includes('***Edit') ? (
+                  <div className="flex items-center justify-between bg-[#11141e] border border-emerald-500/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                      <Check size={16} /> Configured ({apiKeys.CISCO_TALOS_KEY})
+                    </div>
+                    <button type="button" onClick={() => setApiKeys({...apiKeys, CISCO_TALOS_KEY: ''})} className="text-gray-400 hover:text-white text-xs underline">Edit</button>
+                  </div>
+                ) : (
+                  <input type="text" placeholder="Enter API Key..." value={apiKeys.CISCO_TALOS_KEY} onChange={e => setApiKeys({...apiKeys, CISCO_TALOS_KEY: e.target.value})} className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:outline-none transition-colors font-mono text-sm" />
+                )}
               </div>
-              <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-800">
+
+              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-800">
                 <button type="button" onClick={() => setShowSettings(false)} className="px-5 py-2.5 hover:bg-gray-800 rounded-lg text-gray-300 font-medium transition-colors">Cancel</button>
                 <button type="submit" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white font-medium shadow-lg shadow-indigo-900/20 transition-colors">Save Keys</button>
               </div>
@@ -508,6 +543,7 @@ export default function ThreatIntelPage() {
           </div>
         </div>
       )}
+
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
