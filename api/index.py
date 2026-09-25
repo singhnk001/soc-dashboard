@@ -131,6 +131,31 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_mitre_event_id ON mitre_mappings(event_id);
     """)
 
+    # Threat Feeds table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS threat_feeds (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        type TEXT NOT NULL,
+        category TEXT NOT NULL,
+        status TEXT NOT NULL,
+        last_updated TEXT,
+        indicator_count INTEGER DEFAULT 0
+    )
+    """)
+    
+    # Seed AlienVault if not exists
+    cursor.execute("SELECT count(*) FROM threat_feeds")
+    if cursor.fetchone()[0] == 0:
+        import uuid
+        cursor.execute("""
+        INSERT INTO threat_feeds (id, name, url, type, category, status, last_updated, indicator_count) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (str(uuid.uuid4()), "AlienVault OTX", "https://otx.alienvault.com/otxapi/pulses/6a3407d69c9a31c90e0debe2/export/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IlNJTkdITkswMDEiLCJ2YWx1ZSI6WyI2YTM0MDdkNjljOWEzMWM5MGUwZGViZTIiLCJjc3YiXSwiZXhwIjoxNzkwNDU1OTY4fQ.W073M-1h5Jx10LfkftEhX6hvwe3YjFzdrdvvBCukumM&format=csv", "API", "Mixed", "Active", None, 0))
+    
+    conn.commit()
+
     # Safely attempt to add new columns to alerts if the table already existed
     try:
         conn.execute("ALTER TABLE alerts ADD COLUMN resolution_type TEXT")
