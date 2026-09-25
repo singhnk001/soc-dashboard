@@ -132,17 +132,27 @@ def init_db():
     """)
 
     # Threat Feeds table
-    cursor.execute("""
+    cursor.executescript("""
     CREATE TABLE IF NOT EXISTS threat_feeds (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        url TEXT NOT NULL,
-        type TEXT NOT NULL,
-        category TEXT NOT NULL,
-        status TEXT NOT NULL,
-        last_updated TEXT,
-        indicator_count INTEGER DEFAULT 0
-    )
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            type TEXT NOT NULL,
+            category TEXT NOT NULL,
+            status TEXT NOT NULL,
+            last_updated TEXT,
+            indicator_count INTEGER DEFAULT 0,
+            schedule TEXT DEFAULT 'Daily at 00:00 AM'
+        );
+        
+        CREATE TABLE IF NOT EXISTS threat_indicators (
+            id TEXT PRIMARY KEY,
+            feed_id TEXT NOT NULL,
+            type TEXT NOT NULL,
+            indicator TEXT NOT NULL,
+            description TEXT,
+            FOREIGN KEY(feed_id) REFERENCES threat_feeds(id) ON DELETE CASCADE
+        )
     """)
     
     # Seed AlienVault if not exists
@@ -1054,28 +1064,47 @@ def purge_old_logs(days: int = Query(30, ge=1)):
 
 
 
+
 class FeedRequest(BaseModel):
     name: str
     url: str
     type: str
     category: str
+    schedule: str = "Daily at 00:00 AM"
 
 @app.get("/api/threat-feeds")
 def get_threat_feeds():
-    with sqlite3.connect("soc_dashboard.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, url, type, category, status, last_updated, indicator_count FROM threat_feeds")
-        feeds = [{"id": r[0], "name": r[1], "url": r[2], "type": r[3], "category": r[4], "status": r[5], "last_updated": r[6], "indicator_count": r[7]} for r in cursor.fetchall()]
-        return {"data": feeds}
+    try:
+        with sqlite3.connect("soc_dashboard.db") as conn:
+            cursor = conn.cursor()
+            # Try to add schedule column if missing
+            try:
+                cursor.execute("ALTER TABLE threat_feeds ADD COLUMN schedule TEXT DEFAULT 'Daily at 00:00 AM'")
+            except:
+                pass
+            
+            cursor.execute("SELECT id, name, url, type, category, status, last_updated, indicator_count, schedule FROM threat_feeds")
+            feeds = [{"id": r[0], "name": r[1], "url": r[2], "type": r[3], "category": r[4], "status": r[5], "last_updated": r[6], "indicator_count": r[7], "schedule": r[8] if len(r)>8 else "Daily"} for r in cursor.fetchall()]
+            return {"data": feeds}
+    except Exception as e:
+        return {"data": [], "error": str(e)}
 
 @app.post("/api/threat-feeds")
 def add_threat_feed(req: FeedRequest):
     with sqlite3.connect("soc_dashboard.db") as conn:
         cursor = conn.cursor()
         feed_id = str(uuid.uuid4())
-        cursor.execute("INSERT INTO threat_feeds (id, name, url, type, category, status, indicator_count) VALUES (?, ?, ?, ?, ?, 'Active', 0)", (feed_id, req.name, req.url, req.type, req.category))
+        cursor.execute("INSERT INTO threat_feeds (id, name, url, type, category, status, indicator_count, schedule) VALUES (?, ?, ?, ?, ?, 'Active', 0, ?)", (feed_id, req.name, req.url, req.type, req.category, req.schedule))
         conn.commit()
         return {"status": "success", "id": feed_id}
+
+@app.get("/api/threat-feeds/{feed_id}/indicators")
+def get_feed_indicators(feed_id: str):
+    with sqlite3.connect("soc_dashboard.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT type, indicator, description FROM threat_indicators WHERE feed_id = ? LIMIT 100", (feed_id,))
+        indicators = [{"type": r[0], "indicator": r[1], "description": r[2]} for r in cursor.fetchall()]
+        return {"data": indicators}
 
 @app.post("/api/threat-feeds/{feed_id}/sync")
 def sync_feed(feed_id: str):
@@ -1083,6 +1112,7 @@ def sync_feed(feed_id: str):
     import csv
     from io import StringIO
     from datetime import datetime
+    import uuid
     
     with sqlite3.connect("soc_dashboard.db") as conn:
         cursor = conn.cursor()
@@ -1099,7 +1129,20 @@ def sync_feed(feed_id: str):
             
             f = StringIO(response)
             reader = csv.DictReader(f)
-            count = len(list(reader))
+            
+            # Clear old indicators for this feed
+            cursor.execute("DELETE FROM threat_indicators WHERE feed_id = ?", (feed_id,))
+            
+            count = 0
+            for r in reader:
+                # Clean keys
+                clean_r = {k.strip().replace('"', ''): v.strip().replace('"', '') for k, v in r.items()}
+                t = clean_r.get('Indicator type', 'Unknown')
+                i = clean_r.get('Indicator', '')
+                d = clean_r.get('Description', '')
+                if i:
+                    cursor.execute("INSERT INTO threat_indicators (id, feed_id, type, indicator, description) VALUES (?, ?, ?, ?, ?)", (str(uuid.uuid4()), feed_id, t, i, d))
+                    count += 1
             
             now = datetime.utcnow().isoformat() + "Z"
             cursor.execute("UPDATE threat_feeds SET indicator_count = ?, last_updated = ? WHERE id = ?", (count, now, feed_id))
@@ -1116,6 +1159,7 @@ def delete_feed(feed_id: str):
     with sqlite3.connect("soc_dashboard.db") as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM threat_feeds WHERE id = ?", (feed_id,))
+        cursor.execute("DELETE FROM threat_indicators WHERE feed_id = ?", (feed_id,))
         conn.commit()
         return {"status": "success"}
 
