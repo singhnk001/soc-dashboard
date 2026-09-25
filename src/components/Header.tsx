@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, KeyboardEvent } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
+import { Timer } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
@@ -17,6 +18,55 @@ export default function Header() {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [role, setRole] = useState<string>('');
   
+
+
+  const handleLogout = () => {
+    document.cookie = 'soc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    localStorage.removeItem('soc_user');
+    localStorage.removeItem('soc_real_name');
+    localStorage.removeItem('soc_role');
+    router.push('/login');
+  };
+
+  const [timeLeft, setTimeLeft] = useState<number>(90);
+
+  useEffect(() => {
+    const configuredTimeout = parseInt(localStorage.getItem('soc_idle_timeout') || '90', 10);
+    setTimeLeft(configuredTimeout);
+    
+    let timer: NodeJS.Timeout;
+    const resetTimer = () => setTimeLeft(configuredTimeout);
+
+    const tick = () => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          handleLogout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    };
+
+    timer = setInterval(tick, 1000);
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'soc_idle_timeout') {
+        const newTimeout = parseInt(e.newValue || '90', 10);
+        setTimeLeft(newTimeout);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('idle_timeout_change', () => { setTimeLeft(parseInt(localStorage.getItem('soc_idle_timeout') || '90', 10)); });
+    
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(e => document.addEventListener(e, resetTimer));
+
+    return () => {
+      clearInterval(timer);
+      events.forEach(e => document.removeEventListener(e, resetTimer));
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -45,13 +95,7 @@ export default function Header() {
     return name.charAt(0).toUpperCase() + name.slice(1);
   };
 
-  const handleLogout = () => {
-    document.cookie = 'soc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-    localStorage.removeItem('soc_user');
-    localStorage.removeItem('soc_real_name');
-    localStorage.removeItem('soc_role');
-    router.push('/login');
-  };
+
 
   // Hide header on login page
   if (pathname === '/login') return null;
@@ -77,6 +121,12 @@ export default function Header() {
           />
         </div>
 
+        <div className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 rounded text-xs font-mono text-gray-400">
+          <Timer size={14} className={timeLeft < 15 ? 'text-red-500 animate-pulse' : 'text-gray-500'} />
+          <span className={timeLeft < 15 ? 'text-red-500' : ''}>
+            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+          </span>
+        </div>
         <div className="text-sm text-gray-400 hidden sm:block font-mono">
           {currentTime}
         </div>

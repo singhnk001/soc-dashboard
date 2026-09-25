@@ -175,8 +175,54 @@ def init_db():
     if count_uc == 0:
         _seed_use_cases(cursor)
 
+    # Seed Sample Data for Vercel visibility
+    _seed_sample_data(cursor)
+
     conn.commit()
     conn.close()
+
+def _seed_sample_data(cursor):
+    """Seed sample logs and alerts for Vercel deployment visualization."""
+    import uuid
+    from datetime import datetime, timedelta
+    
+    # Check if logs already exist
+    count = cursor.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
+    if count > 0:
+        return
+        
+    now = datetime.utcnow()
+    
+    # Sample Logs
+    logs_data = [
+        # id, timestamp, source, event_id, severity, message, hostname, username, raw_log
+        (str(uuid.uuid4()), (now - timedelta(minutes=5)).isoformat() + "Z", "Security", "4624", "info", "Successful Logon", "DC-01", "admin", "Logon Type: 3"),
+        (str(uuid.uuid4()), (now - timedelta(minutes=10)).isoformat() + "Z", "Security", "4625", "high", "Failed Logon - Bad Password", "WEB-SRV", "root", "Failure Reason: Unknown user name or bad password."),
+        (str(uuid.uuid4()), (now - timedelta(minutes=15)).isoformat() + "Z", "Security", "4625", "high", "Failed Logon - Bad Password", "WEB-SRV", "root", "Failure Reason: Unknown user name or bad password."),
+        (str(uuid.uuid4()), (now - timedelta(minutes=20)).isoformat() + "Z", "Security", "4625", "high", "Failed Logon - Bad Password", "WEB-SRV", "root", "Failure Reason: Unknown user name or bad password."),
+        (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "System", "7045", "high", "A new service was installed.", "DB-01", "SYSTEM", "Service Name: BackdoorSvc"),
+        (str(uuid.uuid4()), (now - timedelta(minutes=45)).isoformat() + "Z", "Security", "1102", "critical", "The audit log was cleared.", "DC-01", "Administrator", "The audit log was cleared by Administrator"),
+        (str(uuid.uuid4()), (now - timedelta(hours=1)).isoformat() + "Z", "Security", "4688", "info", "A new process has been created.", "WORKSTATION-A", "user1", "Process: cmd.exe"),
+        (str(uuid.uuid4()), (now - timedelta(hours=2)).isoformat() + "Z", "Application", "1000", "medium", "Application Error", "WEB-SRV", "-", "Faulting application name: nginx.exe"),
+        (str(uuid.uuid4()), (now - timedelta(hours=3)).isoformat() + "Z", "syslog", "None", "medium", "Failed password for invalid user admin from 192.168.1.50 port 54322 ssh2", "LINUX-SRV", "admin", "Failed password for invalid user"),
+        (str(uuid.uuid4()), (now - timedelta(hours=4)).isoformat() + "Z", "syslog", "None", "info", "Accepted publickey for root from 10.0.0.5", "LINUX-SRV", "root", "Accepted publickey")
+    ]
+    cursor.executemany("""
+        INSERT INTO logs (id, timestamp, source, event_id, severity, message, hostname, username, raw_log)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, logs_data)
+    
+    # Sample Alerts
+    alerts_data = [
+        # id, timestamp, title, description, severity, status, source, event_id, mitre_ref, assigned_to
+        (str(uuid.uuid4()), (now - timedelta(minutes=15)).isoformat() + "Z", "Multiple Login Failures", "Detected 3 failed login attempts for user root on WEB-SRV.", "high", "new", "Security", "4625", "T1110", None),
+        (str(uuid.uuid4()), (now - timedelta(minutes=25)).isoformat() + "Z", "Suspicious Service Installation", "A new service 'BackdoorSvc' was installed on DB-01.", "high", "investigating", "System", "7045", "T1543.003", "admin"),
+        (str(uuid.uuid4()), (now - timedelta(minutes=45)).isoformat() + "Z", "Audit Log Cleared", "The security audit log was cleared on Domain Controller DC-01.", "critical", "new", "Security", "1102", "T1070.001", None)
+    ]
+    cursor.executemany("""
+        INSERT INTO alerts (id, timestamp, title, description, severity, status, source, event_id, mitre_ref, assigned_to)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, alerts_data)
 
 def _seed_use_cases(cursor: sqlite3.Cursor):
     """Seed comprehensive generic detection rules for Windows and Linux."""

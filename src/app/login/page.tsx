@@ -27,6 +27,8 @@ export default function LoginPage() {
       const data = await res.json();
       document.cookie = `soc_session=${data.role}; path=/; max-age=86400`;
       localStorage.setItem('soc_role', data.role);
+      localStorage.setItem('soc_login_time', Date.now().toString());
+      if (data.real_name) localStorage.setItem('soc_real_name', data.real_name);
       router.push('/');
     } catch (err) {
       setError('Connection to auth server failed');

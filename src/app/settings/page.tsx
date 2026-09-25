@@ -48,6 +48,10 @@ export default function SettingsPage() {
   
   const canEdit = role === 'admin' || role === 'l3';
 
+  const [sessionTimeout, setSessionTimeout] = useState('90');
+  useEffect(() => setSessionTimeout(localStorage.getItem('soc_idle_timeout') || '90'), []);
+  const [smtpConfig, setSmtpConfig] = useState({ host: 'smtp.sendgrid.net', port: '587', user: 'apikey', pass: '' });
+  const [slackWebhook, setSlackWebhook] = useState('');
   const [settings, setSettings] = useState({
     realTimeAlerts: true,
     emailNotifications: false,
@@ -116,23 +120,56 @@ export default function SettingsPage() {
           label="Real-time Alert Notifications"
           description="Show browser notifications for new critical and high severity alerts"
           enabled={settings.realTimeAlerts as boolean}
-          onToggle={() => toggle('realTimeAlerts')}
+          onToggle={() => { toggle('realTimeAlerts'); if (!settings.realTimeAlerts && 'Notification' in window) Notification.requestPermission(); }}
           disabled={!canEdit}
         />
         <SettingToggle
           label="Email Notifications"
-          description="Send email digests for unresolved critical alerts"
+          description="Send email digests for unresolved critical alerts via SMTP"
           enabled={settings.emailNotifications as boolean}
           onToggle={() => toggle('emailNotifications')}
           disabled={!canEdit}
         />
+        {settings.emailNotifications && (
+          <div className="p-4 bg-[#11141e] rounded border border-gray-800 mt-2 space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">SMTP Host</label>
+                <input type="text" disabled={!canEdit} value={smtpConfig.host} onChange={e => setSmtpConfig({...smtpConfig, host: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="smtp.gmail.com" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Port</label>
+                <input type="text" disabled={!canEdit} value={smtpConfig.port} onChange={e => setSmtpConfig({...smtpConfig, port: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="587" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Username</label>
+                <input type="text" disabled={!canEdit} value={smtpConfig.user} onChange={e => setSmtpConfig({...smtpConfig, user: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="user@domain.com" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Password / App Password</label>
+                <input type="password" disabled={!canEdit} value={smtpConfig.pass} onChange={e => setSmtpConfig({...smtpConfig, pass: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="********" />
+              </div>
+            </div>
+            <button disabled={!canEdit} onClick={() => alert('SMTP Connection Successful! (Simulated)')} className="mt-2 text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded">Test Connection</button>
+          </div>
+        )}
+        
         <SettingToggle
           label="Slack Integration"
-          description="Post alerts to configured Slack channels"
+          description="Post alerts to configured Slack channels via Webhook"
           enabled={settings.slackIntegration as boolean}
           onToggle={() => toggle('slackIntegration')}
           disabled={!canEdit}
         />
+        {settings.slackIntegration && (
+          <div className="p-4 bg-[#11141e] rounded border border-gray-800 mt-2">
+            <label className="block text-xs text-gray-400 mb-1">Slack Webhook URL</label>
+            <input type="password" disabled={!canEdit} value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)} className="w-full bg-[#0f1219] border border-gray-700 rounded p-2 text-white text-sm" placeholder="https://hooks.slack.com/services/your-workspace/your-channel/your-token" />
+            <button disabled={!canEdit} onClick={() => alert('Test message sent to Slack! (Simulated)')} className="mt-3 text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded">Test Webhook</button>
+          </div>
+        )}
       </div>
 
       {/* Detection Engine */}
@@ -220,6 +257,28 @@ export default function SettingsPage() {
           onToggle={() => toggle('darkMode')}
           disabled={!canEdit}
         />
+        
+        <div className="py-4 border-b border-gray-800">
+          <label className="block text-sm font-medium text-white mb-1">Idle Session Timeout (seconds)</label>
+          <p className="text-gray-500 text-xs mb-2">Automatically sign out if idle for this duration</p>
+          <select
+            disabled={!canEdit}
+            value={sessionTimeout}
+            onChange={e => {
+              setSessionTimeout(e.target.value);
+              localStorage.setItem('soc_idle_timeout', e.target.value);
+              window.dispatchEvent(new Event('idle_timeout_change'));
+            }}
+            className="bg-[#0f1219] border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 w-48 mb-4"
+          >
+            <option value="30">30 seconds</option>
+            <option value="60">1 minute</option>
+            <option value="90">1 minute 30 seconds</option>
+            <option value="300">5 minutes</option>
+            <option value="600">10 minutes</option>
+          </select>
+        </div>
+
         <div className="py-4 border-b border-gray-800">
           <label className="block text-sm font-medium text-white mb-1">Auto-Refresh Interval (seconds)</label>
           <p className="text-gray-500 text-xs mb-2">How often to refresh dashboard data</p>
@@ -232,7 +291,6 @@ export default function SettingsPage() {
             <option value="10">10 seconds</option>
             <option value="30">30 seconds</option>
             <option value="60">1 minute</option>
-            <option value="300">5 minutes</option>
           </select>
         </div>
       </div>

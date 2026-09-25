@@ -2,12 +2,30 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { LayoutDashboard, FileText, Shield, Bell, Settings, Menu, Target, Code, Server } from 'lucide-react';
-import { useState } from 'react';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [realName, setRealName] = useState('');
+  const [uptime, setUptime] = useState('');
+
+  useEffect(() => {
+    setRealName(localStorage.getItem('soc_real_name') || 'Administrator');
+    
+    const updateUptime = () => {
+      const loginTime = parseInt(localStorage.getItem('soc_login_time') || Date.now().toString());
+      const diffInSeconds = Math.floor((Date.now() - loginTime) / 1000);
+      const m = Math.floor(diffInSeconds / 60);
+      const s = diffInSeconds % 60;
+      setUptime(`${m}m ${s}s`);
+    };
+    
+    updateUptime();
+    const interval = setInterval(updateUptime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -60,9 +78,20 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      <div className="p-4 border-t border-[#1f2937] flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-[var(--accent-green)]"></div>
-        {!collapsed && <span className="text-sm text-gray-400">System Status: Online</span>}
+      <div className="p-4 border-t border-[#1f2937] flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-[var(--accent-green)]"></div>
+          {!collapsed && <span className="text-sm text-gray-400">System Status: Online</span>}
+        </div>
+        {!collapsed && (
+          <div className="mt-2 text-xs text-gray-500 bg-gray-800/30 p-2 rounded border border-gray-800">
+            <div className="text-gray-300 font-medium truncate">{realName}</div>
+            <div className="flex justify-between mt-1">
+              <span>Session:</span>
+              <span className="font-mono text-blue-400">{uptime}</span>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );
