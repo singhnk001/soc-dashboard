@@ -27,7 +27,7 @@ export default function ParsersPage() {
 
   // Fetch unique log sources for dropdown
   const { data: sourcesData } = useSWR('/api/sources', fetcher);
-  const uniqueSources = Array.from(new Set(sourcesData?.map((s: any) => s.sources.split(',')).flat().map((s: string) => s.trim()) || []));
+  const uniqueSources = Array.from(new Set(sourcesData?.map((s: any) => (s.source || '').split(',')).flat().map((s: string) => s.trim()) || []));
 
     const getTestResults = () => {
     if (!formData.regex || !sampleLog) return null;
