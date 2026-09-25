@@ -176,24 +176,33 @@ def _seed_use_cases(cursor: sqlite3.Cursor):
     """Seed comprehensive generic detection rules for Windows and Linux."""
     seed_data = [
         # Windows Rules
-        ("UC-W01", "Windows: Multiple Login Failures (Brute Force)", "Detects multiple failed logins (Event 4625).", "threshold", "4625", "T1110", 3, "high", 1),
-        ("UC-W02", "Windows: Clear Audit Logs (Defense Evasion)", "Windows audit logs cleared (Event 1102).", "match", "1102", "T1070.001", None, "critical", 1),
-        ("UC-W03", "Windows: New Service Creation (Persistence)", "A new service was installed in the system (Event 7045/4697).", "match", "4697", "T1543.003", None, "high", 1),
-        ("UC-W04", "Windows: Scheduled Task Created", "A scheduled task was created (Event 4698).", "match", "4698", "T1053.005", None, "medium", 1),
-        ("UC-W05", "Windows: User Account Created", "A new user account was created (Event 4720).", "match", "4720", "T1136.001", None, "low", 1),
+        ("UC-W01", "Windows: Multiple Login Failures (Brute Force)", "Detects multiple failed logins (Event 4625).", "threshold", "4625", "T1110", 3, "high", 1, None),
+        ("UC-W02", "Windows: Clear Audit Logs (Defense Evasion)", "Windows audit logs cleared (Event 1102).", "match", "1102", "T1070.001", None, "critical", 1, None),
+        ("UC-W03", "Windows: New Service Creation (Persistence)", "A new service was installed in the system (Event 7045/4697).", "match", "4697", "T1543.003", None, "high", 1, None),
+        ("UC-W04", "Windows: Scheduled Task Created", "A scheduled task was created (Event 4698).", "match", "4698", "T1053.005", None, "medium", 1, None),
+        ("UC-W05", "Windows: User Account Created", "A new user account was created (Event 4720).", "match", "4720", "T1136.001", None, "low", 1, None),
         
         # Linux Rules
-        ("UC-L01", "Linux: SSH Brute Force", "Multiple failed SSH logins.", "threshold", None, "T1110", 3, "high", 1),
-        ("UC-L02", "Linux: Privilege Escalation Attempt", "Failed sudo or authentication failure.", "threshold", None, "T1078", 2, "high", 1),
-        ("UC-L03", "Linux: Local Account Creation", "New user added via useradd.", "match", None, "T1136", None, "medium", 1),
-        ("UC-L04", "Linux: Firewall Tampering", "iptables/ufw rules modified or disabled.", "match", None, "T1562.004", None, "critical", 1),
-        ("UC-L05", "Linux: Suspicious Cron Job", "Cron job added for persistence.", "match", None, "T1053.003", None, "medium", 1),
-        ("UC-L06", "Linux: Package Execution", "Use of apt/yum (potential suspicious install).", "match", None, "T1059", None, "info", 1)
+        ("UC-L01", "Linux: SSH Brute Force", "Multiple failed SSH logins.", "threshold", None, "T1110", 3, "high", 1, None),
+        ("UC-L02", "Linux: Privilege Escalation Attempt", "Failed sudo or authentication failure.", "threshold", None, "T1078", 2, "high", 1, None),
+        ("UC-L03", "Linux: Local Account Creation", "New user added via useradd.", "match", None, "T1136", None, "medium", 1, None),
+        ("UC-L04", "Linux: Firewall Tampering", "iptables/ufw rules modified or disabled.", "match", None, "T1562.004", None, "critical", 1, None),
+        ("UC-L05", "Linux: Suspicious Cron Job", "Cron job added for persistence.", "match", None, "T1053.003", None, "medium", 1, None),
+        ("UC-L06", "Linux: Package Execution", "Use of apt/yum (potential suspicious install).", "match", None, "T1059", None, "info", 1, None)
     ]
     cursor.executemany("""
         INSERT INTO use_cases (id, title, description, type, event_id, mitre_technique, threshold_count, severity, active, rule_logic)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, seed_data)
+
+
+def _seed_parsers(cursor: sqlite3.Cursor):
+    """Seed custom log parsers."""
+    parsers_data = [
+        ("PARSER-01", "Cisco ASA Firewall", r"%ASA-\d+-(\d+): (.+)", "Parses Cisco ASA syslog messages", 1, "syslog"),
+        ("PARSER-02", "Nginx Access Log", r"(?P<ip>\S+) \S+ \S+ \[.*?\] \"(?P<method>\S+) (?P<path>\S+) \S+\" (?P<status>\d+) .*", "Parses Nginx access logs", 1, "nginx")
+    ]
+    cursor.executemany("INSERT INTO parsers (id, name, regex, description, active, log_source) VALUES (?, ?, ?, ?, ?, ?)", parsers_data)
 
 def _seed_mitre_mappings(cursor: sqlite3.Cursor):
     """Seed the MITRE ATT&CK mapping table with 50+ Windows Event ID mappings."""
