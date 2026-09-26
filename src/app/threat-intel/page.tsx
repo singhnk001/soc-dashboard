@@ -16,6 +16,16 @@ export default function ThreatIntelPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) setCurrentUser(JSON.parse(userStr));
+    } catch(e) {}
+  }, []);
+  
+  const canEdit = currentUser && currentUser.role !== "readonly";
   
   // Settings State
   const [apiKeys, setApiKeys] = useState({
@@ -236,12 +246,12 @@ export default function ThreatIntelPage() {
                 className="w-full bg-[#11141e] border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors shadow-inner"
               />
             </div>
-            <button 
+            {canEdit && <button 
               onClick={openAddModal}
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-lg shadow-blue-900/20"
             >
               <Plus size={18} /> Configure Feed
-            </button>
+            </button>}
           </div>
 
           <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
@@ -285,17 +295,19 @@ export default function ThreatIntelPage() {
                           {f.last_updated ? formatDistanceToNow(new Date(f.last_updated)) + ' ago' : 'Never'}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleSync(f.id)} className="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded" title="Sync Now">
-                              <RefreshCw size={16} />
-                            </button>
-                            <button onClick={() => handleEdit(f)} className="p-1.5 text-gray-400 hover:bg-gray-700 rounded" title="Edit Feed">
-                              <Edit2 size={16} />
-                            </button>
-                            <button onClick={() => handleDelete(f.id)} className="p-1.5 text-rose-400 hover:bg-rose-400/10 rounded" title="Delete">
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                          {canEdit && (
+                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleSync(f.id)} className="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded" title="Sync Now">
+                                <RefreshCw size={16} />
+                              </button>
+                              <button onClick={() => handleEdit(f)} className="p-1.5 text-gray-400 hover:bg-gray-700 rounded" title="Edit Feed">
+                                <Edit2 size={16} />
+                              </button>
+                              <button onClick={() => handleDelete(f.id)} className="p-1.5 text-rose-400 hover:bg-rose-400/10 rounded" title="Delete">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                       {expandedRows.has(f.id) && (
@@ -364,9 +376,9 @@ export default function ThreatIntelPage() {
             <h2 className="text-xl font-semibold text-white flex items-center gap-2">
               <Globe className="text-indigo-400" /> Deep Indicator Lookup
             </h2>
-            <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 px-3 py-2 bg-[#1a1f2e] hover:bg-gray-800 border border-gray-700 text-gray-300 rounded transition-colors text-sm">
+            {canEdit && <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 px-3 py-2 bg-[#1a1f2e] hover:bg-gray-800 border border-gray-700 text-gray-300 rounded transition-colors text-sm">
               <Settings size={16} /> API Settings
-            </button>
+            </button>}
           </div>
           
           <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 shadow-xl">

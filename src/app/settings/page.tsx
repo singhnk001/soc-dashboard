@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [mfaCode, setMfaCode] = useState('');
   const [mfaError, setMfaError] = useState('');
   const [mfaSuccess, setMfaSuccess] = useState(false);
+  const canEdit = currentUser && currentUser.role !== "readonly";
   
   useEffect(() => {
     try {
@@ -248,8 +249,8 @@ export default function SettingsPage() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex gap-3 justify-end">
-                        <button className="text-gray-500 hover:text-white transition-colors">Edit</button>
-                        {u.username !== 'admin' && (
+                        {canEdit && <button className="text-gray-500 hover:text-white transition-colors">Edit</button>}
+                        {canEdit && u.username !== 'admin' && (
                           <button className="text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
                         )}
                       </div>
@@ -260,17 +261,17 @@ export default function SettingsPage() {
             </table>
           </div>
           
-          <button className="flex items-center gap-2 bg-[#11141e] hover:bg-gray-800 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium">
+          {canEdit && <button className="flex items-center gap-2 bg-[#11141e] hover:bg-gray-800 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium">
             <UserPlus size={18} /> Provision New User
-          </button>
+          </button>}
         </div>
       )}
 
       {activeTab === 'system' && (
          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 animate-in fade-in duration-300">
              <h3 className="text-lg font-bold text-white mb-6">System Preferences</h3>
-             <SettingToggle label="Enable Email Notifications" description="Send critical alerts to SOC distribution lists." enabled={false} onToggle={()=>{}} />
-             <SettingToggle label="Dark Mode Enforcement" description="Force dark mode for all analysts globally." enabled={true} onToggle={()=>{}} />
+             <SettingToggle disabled={!canEdit} label="Enable Email Notifications" description="Send critical alerts to SOC distribution lists." enabled={false} onToggle={()=>{}} />
+             <SettingToggle disabled={!canEdit} label="Dark Mode Enforcement" description="Force dark mode for all analysts globally." enabled={true} onToggle={()=>{}} />
          </div>
       )}
     </div>

@@ -1,3 +1,6 @@
-fastapi>=0.115.0
+﻿fastapi>=0.115.0
 uvicorn>=0.34.0
 python-dateutil>=2.9.0
+requests
+pyotp
+python-dotenv
