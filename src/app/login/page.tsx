@@ -13,6 +13,15 @@ export default function LoginPage() {
   
   // MFA States
   const [mfaRequired, setMfaRequired] = useState(false);
+
+  // Clear stale session data on mount
+  React.useEffect(() => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("soc_user");
+    localStorage.removeItem("soc_role");
+    localStorage.removeItem("soc_real_name");
+  }, []);
+
   const [mfaUserId, setMfaUserId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
 
@@ -37,7 +46,7 @@ export default function LoginPage() {
           localStorage.setItem('soc_user', data.user.username);
           localStorage.setItem('soc_real_name', data.user.real_name);
           localStorage.setItem('soc_role', data.user.role);
-          document.cookie = `soc_session=${data.user.role}; path=/; max-age=86400`;
+          document.cookie = `soc_session=${data.user.role}; path=/`;
           router.push('/');
         } else {
           setError(data.detail || 'Invalid verification code');
@@ -61,7 +70,7 @@ export default function LoginPage() {
             localStorage.setItem('soc_user', data.user.username);
             localStorage.setItem('soc_real_name', data.user.real_name);
             localStorage.setItem('soc_role', data.user.role);
-            document.cookie = `soc_session=${data.user.role}; path=/; max-age=86400`;
+            document.cookie = `soc_session=${data.user.role}; path=/`;
             router.push('/');
           }
         } else {
