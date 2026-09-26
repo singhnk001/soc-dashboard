@@ -34,6 +34,9 @@ export default function LoginPage() {
         
         if (res.ok && data.status === 'success') {
           localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('soc_user', data.user.username);
+          localStorage.setItem('soc_real_name', data.user.real_name);
+          localStorage.setItem('soc_role', data.user.role);
           document.cookie = `soc_session=${data.user.role}; path=/; max-age=86400`;
           router.push('/');
         } else {
@@ -55,6 +58,9 @@ export default function LoginPage() {
             setMfaUserId(data.user_id);
           } else if (data.status === 'success') {
             localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('soc_user', data.user.username);
+            localStorage.setItem('soc_real_name', data.user.real_name);
+            localStorage.setItem('soc_role', data.user.role);
             document.cookie = `soc_session=${data.user.role}; path=/; max-age=86400`;
             router.push('/');
           }
