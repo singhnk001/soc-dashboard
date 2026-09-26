@@ -74,3 +74,14 @@ body {
 .soc-table tr:hover {
   background-color: #1f2937;
 }
+.light-mode-hack {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.light-mode-hack img, .light-mode-hack svg {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.light-mode-hack .alert-pulse {
+  animation: none;
+}

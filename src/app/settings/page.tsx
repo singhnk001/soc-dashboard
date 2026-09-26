@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Save, Shield, Monitor, ToggleLeft, ToggleRight, Users, UserPlus, Trash2, Key, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, Shield, Monitor, ToggleLeft, ToggleRight, Users, UserPlus, Trash2, Key, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface SettingToggleProps {
@@ -33,18 +33,29 @@ function SettingToggle({ label, description, enabled, onToggle, disabled }: Sett
 
 export default function SettingsPage() {
   const fetcher = (url: string) => fetch(url).then(res => res.json());
-  const { data: usersData } = useSWR('/api/users', fetcher);
+  const { data: usersData, mutate } = useSWR('/api/users', fetcher);
   const users = usersData?.data || usersData || [];
   
   const [activeTab, setActiveTab] = useState('security');
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  const canEdit = currentUser && currentUser.role !== "readonly";
 
   // MFA State
   const [mfaSetup, setMfaSetup] = useState<any>(null);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaError, setMfaError] = useState('');
   const [mfaSuccess, setMfaSuccess] = useState(false);
-  const canEdit = currentUser && currentUser.role !== "readonly";
+
+  // User Management State
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'l1', real_name: '', status: 'Active' });
+  const [userError, setUserError] = useState('');
+
+  // System Prefs State
+  const [darkMode, setDarkMode] = useState(true);
+  const [emailEnabled, setEmailEnabled] = useState(false);
   
   useEffect(() => {
     try {
@@ -52,8 +63,28 @@ export default function SettingsPage() {
       if (userStr) {
         setCurrentUser(JSON.parse(userStr));
       }
+      
+      const storedDark = localStorage.getItem('soc_dark_mode');
+      if (storedDark !== null) {
+        setDarkMode(storedDark === 'true');
+      }
     } catch(e) {}
   }, []);
+
+  // Update light mode hack on body
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.remove('light-mode-hack');
+    } else {
+      document.body.classList.add('light-mode-hack');
+    }
+  }, [darkMode]);
+
+  const handleToggleDarkMode = () => {
+    const newVal = !darkMode;
+    setDarkMode(newVal);
+    localStorage.setItem('soc_dark_mode', newVal.toString());
+  };
   
   const handleEnableMFA = async () => {
     if (!currentUser) return;
@@ -86,7 +117,6 @@ export default function SettingsPage() {
       if (res.ok && data.status === 'success') {
         setMfaSuccess(true);
         setMfaError('');
-        // Update local user object
         const updatedUser = { ...currentUser, mfa_enabled: true };
         setCurrentUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -95,6 +125,62 @@ export default function SettingsPage() {
       }
     } catch(e) {
       setMfaError('Error verifying code.');
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUser.username || !newUser.password) {
+      setUserError("Username and password required");
+      return;
+    }
+    setUserError("");
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+      });
+      if (res.ok) {
+        setIsAddingUser(false);
+        setNewUser({ username: '', password: '', role: 'l1', real_name: '', status: 'Active' });
+        mutate();
+      } else {
+        const data = await res.json();
+        setUserError(data.detail || 'Failed to create user');
+      }
+    } catch (err) {
+      setUserError('Network error');
+    }
+  };
+
+  const handleSaveUser = async () => {
+    if (!editingUser) return;
+    try {
+      const res = await fetch(`/api/users/${editingUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: editingUser.role,
+          real_name: editingUser.real_name,
+          status: editingUser.status
+        })
+      });
+      if (res.ok) {
+        setEditingUser(null);
+        mutate();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      mutate();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -216,7 +302,7 @@ export default function SettingsPage() {
       )}
 
       {activeTab === 'users' && (
-        <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 animate-in fade-in duration-300">
+        <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 animate-in fade-in duration-300 relative">
           <div className="flex items-center gap-3 mb-6">
             <Users size={24} className="text-purple-500" />
             <h3 className="text-lg font-bold text-white">User Management & RBAC</h3>
@@ -249,9 +335,9 @@ export default function SettingsPage() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex gap-3 justify-end">
-                        {canEdit && <button className="text-gray-500 hover:text-white transition-colors">Edit</button>}
+                        {canEdit && <button onClick={() => setEditingUser(u)} className="text-gray-500 hover:text-white transition-colors">Edit</button>}
                         {canEdit && u.username !== 'admin' && (
-                          <button className="text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
+                          <button onClick={() => handleDeleteUser(u.id)} className="text-gray-500 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
                         )}
                       </div>
                     </td>
@@ -261,17 +347,102 @@ export default function SettingsPage() {
             </table>
           </div>
           
-          {canEdit && <button className="flex items-center gap-2 bg-[#11141e] hover:bg-gray-800 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium">
-            <UserPlus size={18} /> Provision New User
-          </button>}
+          {canEdit && (
+            <button onClick={() => setIsAddingUser(true)} className="flex items-center gap-2 bg-[#11141e] hover:bg-gray-800 border border-gray-700 text-white px-4 py-2.5 rounded-lg transition-colors font-medium">
+              <UserPlus size={18} /> Provision New User
+            </button>
+          )}
+
+          {/* ADD USER MODAL */}
+          {isAddingUser && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
+              <div className="bg-[#1a1f2e] border border-gray-700 rounded-xl p-6 w-96 shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold text-white">Provision New User</h3>
+                  <button onClick={() => setIsAddingUser(false)} className="text-gray-500 hover:text-white"><X size={20} /></button>
+                </div>
+                
+                {userError && <div className="mb-4 text-sm text-red-400 bg-red-500/10 p-2 rounded">{userError}</div>}
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Username</label>
+                    <input type="text" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none rounded p-2.5 text-white" placeholder="johndoe" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Password</label>
+                    <input type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none rounded p-2.5 text-white" placeholder="••••••••" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Full Name</label>
+                    <input type="text" value={newUser.real_name} onChange={e => setNewUser({...newUser, real_name: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 focus:border-blue-500 outline-none rounded p-2.5 text-white" placeholder="John Doe" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Role</label>
+                    <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 focus:border-blue-500 outline-none rounded p-2.5 text-white">
+                      <option value="admin">Admin</option>
+                      <option value="l3">L3 Analyst</option>
+                      <option value="l2">L2 Analyst</option>
+                      <option value="l1">L1 Analyst</option>
+                      <option value="readonly">Read-Only</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-gray-800">
+                    <button onClick={() => setIsAddingUser(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
+                    <button onClick={handleCreateUser} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">Create User</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* EDIT USER MODAL */}
+          {editingUser && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
+              <div className="bg-[#1a1f2e] border border-gray-700 rounded-xl p-6 w-96 shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold text-white">Edit User: {editingUser.username}</h3>
+                  <button onClick={() => setEditingUser(null)} className="text-gray-500 hover:text-white"><X size={20} /></button>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Full Name</label>
+                    <input type="text" value={editingUser.real_name || ''} onChange={e => setEditingUser({...editingUser, real_name: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 focus:border-blue-500 outline-none rounded p-2.5 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Role</label>
+                    <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 focus:border-blue-500 outline-none rounded p-2.5 text-white" disabled={editingUser.username === 'admin'}>
+                      <option value="admin">Admin</option>
+                      <option value="l3">L3 Analyst</option>
+                      <option value="l2">L2 Analyst</option>
+                      <option value="l1">L1 Analyst</option>
+                      <option value="readonly">Read-Only</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Status</label>
+                    <select value={editingUser.status} onChange={e => setEditingUser({...editingUser, status: e.target.value})} className="w-full bg-[#0f1219] border border-gray-700 focus:border-blue-500 outline-none rounded p-2.5 text-white" disabled={editingUser.username === 'admin'}>
+                      <option value="Active">Active</option>
+                      <option value="Disabled">Disabled</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-gray-800">
+                    <button onClick={() => setEditingUser(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
+                    <button onClick={handleSaveUser} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">Save Changes</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {activeTab === 'system' && (
          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-8 animate-in fade-in duration-300">
              <h3 className="text-lg font-bold text-white mb-6">System Preferences</h3>
-             <SettingToggle disabled={!canEdit} label="Enable Email Notifications" description="Send critical alerts to SOC distribution lists." enabled={false} onToggle={()=>{}} />
-             <SettingToggle disabled={!canEdit} label="Dark Mode Enforcement" description="Force dark mode for all analysts globally." enabled={true} onToggle={()=>{}} />
+             <SettingToggle disabled={!canEdit} label="Enable Email Notifications" description="Send critical alerts to SOC distribution lists." enabled={emailEnabled} onToggle={() => setEmailEnabled(!emailEnabled)} />
+             <SettingToggle disabled={!canEdit} label="Dark Mode Enforcement" description="Toggle between dark and light themes." enabled={darkMode} onToggle={handleToggleDarkMode} />
          </div>
       )}
     </div>
