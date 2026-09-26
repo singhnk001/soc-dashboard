@@ -162,11 +162,7 @@ export default function LoginPage() {
           )}
         </form>
 
-        <div className="mt-8 pt-6 border-t border-gray-800 text-center">
-          <p className="text-sm text-gray-500">
-            For demo purposes: Use <span className="text-gray-300 font-mono">admin</span> / <span className="text-gray-300 font-mono">Singhnk.001k</span>
-          </p>
-        </div>
+
       </div>
     </div>
   );

@@ -50,7 +50,8 @@ def init_db():
             password TEXT NOT NULL,
             role TEXT NOT NULL,
             real_name TEXT DEFAULT '',
-            status TEXT DEFAULT 'Active'
+            status TEXT DEFAULT 'Active',
+            mfa_secret TEXT
         );
 
         CREATE TABLE IF NOT EXISTS logs (
