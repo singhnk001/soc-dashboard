@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { DEMO_PLAYBOOK_EXECUTIONS } from '@/lib/demo-data';
+import { DEMO_PLAYBOOK_EXECUTIONS, shouldProxy } from '@/lib/demo-data';
 
 export async function GET() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
+  if (!shouldProxy()) {
+    return NextResponse.json(DEMO_PLAYBOOK_EXECUTIONS);
+  }
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   try {
     const res = await fetch(`${apiUrl}/api/playbooks/executions`, {
       signal: AbortSignal.timeout(2000),
@@ -11,8 +14,6 @@ export async function GET() {
     if (res.ok) {
       return NextResponse.json(await res.json());
     }
-  } catch {
-    // Fallback
-  }
+  } catch {}
   return NextResponse.json(DEMO_PLAYBOOK_EXECUTIONS);
 }

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
 import { systemService, sourcesService } from '@/services';
+import { DEMO_SERVICES, DEMO_SYSTEM_HEALTH, DEMO_AGENTS } from '@/lib/demo-data';
 import {
   Activity, Play, Square, RotateCw, Server, AlertCircle, Loader2,
   Cpu, HardDrive, Clock, Radio, Wifi, WifiOff, RefreshCw, Monitor,
@@ -67,11 +68,11 @@ function ServiceStatusBadge({ status }: { status: string }) {
 
 export default function TroubleshootingPage() {
   const { data: svcData, mutate: mutateSvc, isLoading: svcLoading } = useSWR(
-    '/api/system/services', fetcher, { refreshInterval: 3000 }
+    '/api/system/services', fetcher, { refreshInterval: 3000, fallbackData: { data: DEMO_SERVICES } }
   );
-  const { data: healthData } = useSWR('/api/system/health', fetcher, { refreshInterval: 3000 });
+  const { data: healthData } = useSWR('/api/system/health', fetcher, { refreshInterval: 3000, fallbackData: DEMO_SYSTEM_HEALTH });
   const { data: agentsData, mutate: mutateAgents } = useSWR(
-    '/api/system/vector/agents', fetcher, { refreshInterval: 10000 }
+    '/api/system/vector/agents', fetcher, { refreshInterval: 10000, fallbackData: { data: DEMO_AGENTS } }
   );
 
   const services: any[] = svcData?.data || [];

@@ -3,6 +3,11 @@
  * High-fidelity SOC data for Vercel preview and demo access mode.
  */
 
+export function shouldProxy(): boolean {
+  const url = process.env.NEXT_PUBLIC_API_URL;
+  return Boolean(url && !url.includes('127.0.0.1') && !url.includes('localhost'));
+}
+
 export const DEMO_SYSTEM_HEALTH = {
   status: 'ok',
   cpu_percent: 18.4,
@@ -73,6 +78,7 @@ export const DEMO_AGENTS = [
     criticality: 'critical',
     last_seen: 'Just now',
     events_per_sec: 185,
+    log_count: 52400,
   },
   {
     hostname: 'WIN-FILE02.corp.local',
@@ -83,6 +89,7 @@ export const DEMO_AGENTS = [
     criticality: 'high',
     last_seen: 'Just now',
     events_per_sec: 42,
+    log_count: 14200,
   },
   {
     hostname: 'SQL-PROD-01.corp.local',
@@ -93,6 +100,7 @@ export const DEMO_AGENTS = [
     criticality: 'critical',
     last_seen: '1 min ago',
     events_per_sec: 120,
+    log_count: 34100,
   },
   {
     hostname: 'UBUNTU-K8S-NODE01',
@@ -103,6 +111,7 @@ export const DEMO_AGENTS = [
     criticality: 'medium',
     last_seen: '2 min ago',
     events_per_sec: 65,
+    log_count: 18400,
   },
   {
     hostname: 'PFSENSE-FW-01',
@@ -113,6 +122,7 @@ export const DEMO_AGENTS = [
     criticality: 'critical',
     last_seen: 'Just now',
     events_per_sec: 230,
+    log_count: 68900,
   },
   {
     hostname: 'WIN-WS-ANALYST04',
@@ -123,6 +133,7 @@ export const DEMO_AGENTS = [
     criticality: 'low',
     last_seen: '8 min ago',
     events_per_sec: 14,
+    log_count: 4800,
   },
 ];
 
@@ -132,11 +143,15 @@ export const DEMO_SOURCES = [
     ip_address: '10.0.0.10',
     os_version: 'Windows Server 2022 Datacenter',
     status: 'healthy',
+    eps: 185,
     events_per_second: 185,
+    lastSeen: new Date(Date.now() - 30 * 1000).toISOString(),
     last_seen: new Date(Date.now() - 30 * 1000).toISOString(),
     agent_version: '0.41.1',
+    source: 'VectorAgent (Security EventLog)',
     protocol: 'Vector HTTP Sink',
     link_speed: '10 Gbps',
+    totalEvents: 52400,
     total_events: 52400,
   },
   {
@@ -144,11 +159,15 @@ export const DEMO_SOURCES = [
     ip_address: '10.0.0.22',
     os_version: 'Windows Server 2022',
     status: 'healthy',
+    eps: 120,
     events_per_second: 120,
+    lastSeen: new Date(Date.now() - 60 * 1000).toISOString(),
     last_seen: new Date(Date.now() - 60 * 1000).toISOString(),
     agent_version: '0.41.1',
+    source: 'VectorAgent (Application & System)',
     protocol: 'Vector HTTP Sink',
     link_speed: '10 Gbps',
+    totalEvents: 34100,
     total_events: 34100,
   },
   {
@@ -156,11 +175,15 @@ export const DEMO_SOURCES = [
     ip_address: '192.168.1.1',
     os_version: 'pfSense Plus 24.03',
     status: 'healthy',
+    eps: 230,
     events_per_second: 230,
+    lastSeen: new Date(Date.now() - 15 * 1000).toISOString(),
     last_seen: new Date(Date.now() - 15 * 1000).toISOString(),
     agent_version: 'RFC3164 Syslog',
+    source: 'pfSense Packet Filter (filterlog)',
     protocol: 'UDP 1514',
     link_speed: '1 Gbps',
+    totalEvents: 68900,
     total_events: 68900,
   },
   {
@@ -168,11 +191,15 @@ export const DEMO_SOURCES = [
     ip_address: '10.0.1.50',
     os_version: 'Ubuntu 22.04 LTS',
     status: 'healthy',
+    eps: 65,
     events_per_second: 65,
+    lastSeen: new Date(Date.now() - 120 * 1000).toISOString(),
     last_seen: new Date(Date.now() - 120 * 1000).toISOString(),
     agent_version: '0.41.1',
+    source: 'VectorAgent (Syslog / Auth.log)',
     protocol: 'Vector HTTP Sink',
     link_speed: '1 Gbps',
+    totalEvents: 18400,
     total_events: 18400,
   },
 ];
@@ -254,53 +281,52 @@ export const DEMO_THREAT_FEEDS = [
   },
 ];
 
-export const DEMO_INDICATORS = [
-  {
-    id: 'ind-01',
-    indicator: '194.26.29.112',
-    type: 'IPv4',
-    confidence: 98,
-    severity: 'critical',
-    description: 'Cobalt Strike C2 server associated with FIN7 ransomware staging',
-    date_added: new Date(Date.now() - 3600 * 1000 * 5).toISOString(),
-  },
-  {
-    id: 'ind-02',
-    indicator: '45.154.255.88',
-    type: 'IPv4',
-    confidence: 95,
-    severity: 'high',
-    description: 'Brute-force SSH and RDP scanning botnet node',
-    date_added: new Date(Date.now() - 3600 * 1000 * 8).toISOString(),
-  },
-  {
-    id: 'ind-03',
-    indicator: 'update-microsoft-azure.com',
-    type: 'Domain',
-    confidence: 92,
-    severity: 'high',
-    description: 'Phishing domain mimicking Microsoft Entra ID authentication page',
-    date_added: new Date(Date.now() - 3600 * 1000 * 12).toISOString(),
-  },
-  {
-    id: 'ind-04',
-    indicator: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    type: 'SHA256',
-    confidence: 100,
-    severity: 'critical',
-    description: 'BlackCat / ALPHV Ransomware encryptor payload binary',
-    date_added: new Date(Date.now() - 3600 * 1000 * 20).toISOString(),
-  },
-  {
-    id: 'ind-05',
-    indicator: '185.220.101.5',
-    type: 'IPv4',
-    confidence: 88,
-    severity: 'medium',
-    description: 'Tor Exit Node flagged in anomalous administrative logins',
-    date_added: new Date(Date.now() - 3600 * 1000 * 24).toISOString(),
-  },
-];
+export function getDemoIndicatorsForFeed(feedId?: string) {
+  if (feedId === 'tf-urlhaus') {
+    return [
+      { id: 'url-01', indicator: 'http://185.196.8.22/bins/arm7', type: 'URL', confidence: 99, severity: 'critical', description: 'Mirai botnet dropper payload URL', date_added: '1 hour ago' },
+      { id: 'url-02', indicator: 'https://secure-login-portal-auth.com/verify.php', type: 'URL', confidence: 95, severity: 'high', description: 'Credential harvesting phishing landing page', date_added: '2 hours ago' },
+      { id: 'url-03', indicator: 'http://cdn-update-installer.top/setup.exe', type: 'URL', confidence: 98, severity: 'critical', description: 'RedLine Stealer trojan distribution URL', date_added: '3 hours ago' },
+      { id: 'url-04', indicator: 'https://pay-invoice-confirm.xyz/doc_7482.zip', type: 'URL', confidence: 92, severity: 'high', description: 'Qakbot / Pinkslipbot malware attachment link', date_added: '4 hours ago' },
+      { id: 'url-05', indicator: 'http://194.38.20.108/wp-content/plugins/rev.php', type: 'URL', confidence: 96, severity: 'critical', description: 'Compromised WordPress webshell back-door', date_added: '5 hours ago' },
+    ];
+  }
+  if (feedId === 'tf-threatfox') {
+    return [
+      { id: 'fox-01', indicator: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', type: 'SHA256', confidence: 100, severity: 'critical', description: 'BlackCat / ALPHV Ransomware encryptor core', date_added: '2 hours ago' },
+      { id: 'fox-02', indicator: '149.202.160.104:443', type: 'IPv4:Port', confidence: 95, severity: 'high', description: 'Sliver C2 framework interactive session handler', date_added: '3 hours ago' },
+      { id: 'fox-03', indicator: '84.46.251.109:8080', type: 'IPv4:Port', confidence: 90, severity: 'high', description: 'AsyncRAT command & control node', date_added: '5 hours ago' },
+      { id: 'fox-04', indicator: '5d41402abc4b2a76b9719d911017c592', type: 'MD5', confidence: 97, severity: 'critical', description: 'LockBit 3.0 ransomware staging executable', date_added: '6 hours ago' },
+    ];
+  }
+  if (feedId === 'tf-cisa') {
+    return [
+      { id: 'cisa-01', indicator: 'CVE-2024-3400', type: 'CVE', confidence: 100, severity: 'critical', description: 'Palo Alto PAN-OS Command Injection in GlobalProtect', date_added: '1 day ago' },
+      { id: 'cisa-02', indicator: 'CVE-2023-46805', type: 'CVE', confidence: 100, severity: 'critical', description: 'Ivanti Connect Secure Authentication Bypass', date_added: '2 days ago' },
+      { id: 'cisa-03', indicator: 'CVE-2023-22515', type: 'CVE', confidence: 99, severity: 'critical', description: 'Atlassian Confluence Data Center Privilege Escalation', date_added: '3 days ago' },
+      { id: 'cisa-04', indicator: 'CVE-2024-1709', type: 'CVE', confidence: 98, severity: 'critical', description: 'ConnectWise ScreenConnect Authentication Bypass', date_added: '4 days ago' },
+    ];
+  }
+  if (feedId === 'tf-abuseipdb') {
+    return [
+      { id: 'ab-01', indicator: '45.154.255.88', type: 'IPv4', confidence: 99, severity: 'critical', description: 'Reported 14,200 times for brute-force SSH & RDP scanning', date_added: '30 mins ago' },
+      { id: 'ab-02', indicator: '185.220.101.5', type: 'IPv4', confidence: 90, severity: 'high', description: 'Tor Exit Node flagged in anomalous administrative logins', date_added: '1 hour ago' },
+      { id: 'ab-03', indicator: '109.236.87.14', type: 'IPv4', confidence: 94, severity: 'high', description: 'Active port scanning and vulnerability probing', date_added: '2 hours ago' },
+      { id: 'ab-04', indicator: '91.240.118.230', type: 'IPv4', confidence: 96, severity: 'critical', description: 'Exploit scanner targeting Microsoft Exchange CVEs', date_added: '3 hours ago' },
+    ];
+  }
+  // Default (AlienVault OTX & general)
+  return [
+    { id: 'ind-01', indicator: '194.26.29.112', type: 'IPv4', confidence: 98, severity: 'critical', description: 'Cobalt Strike C2 server associated with FIN7 ransomware staging', date_added: '1 hour ago' },
+    { id: 'ind-02', indicator: 'update-microsoft-azure.com', type: 'Domain', confidence: 94, severity: 'high', description: 'Phishing domain mimicking Microsoft Entra ID authentication page', date_added: '2 hours ago' },
+    { id: 'ind-03', indicator: '185.196.8.22', type: 'IPv4', confidence: 99, severity: 'critical', description: 'Active botnet distribution staging host', date_added: '3 hours ago' },
+    { id: 'ind-04', indicator: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', type: 'SHA256', confidence: 100, severity: 'critical', description: 'BlackCat / ALPHV Ransomware encryptor payload binary', date_added: '4 hours ago' },
+    { id: 'ind-05', indicator: '45.154.255.88', type: 'IPv4', confidence: 95, severity: 'high', description: 'Brute-force SSH and RDP scanning botnet node', date_added: '5 hours ago' },
+    { id: 'ind-06', indicator: 'auth-security-checkpoint.xyz', type: 'Domain', confidence: 91, severity: 'medium', description: 'Suspicious domain flagged in phishing campaign telemetry', date_added: '6 hours ago' },
+  ];
+}
+
+export const DEMO_INDICATORS = getDemoIndicatorsForFeed();
 
 export const DEMO_PARSERS = [
   {

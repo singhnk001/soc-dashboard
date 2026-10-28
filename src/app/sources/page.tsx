@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { sourcesService } from '@/services/sources.service';
 import { Loader2, Server, Cloud, ShieldCheck, AlertCircle, Plus, X, Box, Shield, CheckCircle, Edit, Trash2, ChevronDown, ChevronRight, Activity, Network } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { DEMO_SOURCES, DEMO_API_SOURCES } from '@/lib/demo-data';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
   if (err instanceof Event) throw new Error("Network Event Error");
@@ -23,8 +24,8 @@ export default function SourcesPage() {
     return () => window.removeEventListener('refresh_interval_change', updateInterval);
   }, []);
 
-  const { data: sources, isLoading, mutate: mutateSources } = useSWR('/api/sources', fetcher, { refreshInterval });
-  const { data: apiSourcesData, mutate: mutateApiSources } = useSWR('/api/api-sources', fetcher, { refreshInterval });
+  const { data: sources, isLoading, mutate: mutateSources } = useSWR('/api/sources', fetcher, { refreshInterval, fallbackData: DEMO_SOURCES });
+  const { data: apiSourcesData, mutate: mutateApiSources } = useSWR('/api/api-sources', fetcher, { refreshInterval, fallbackData: DEMO_API_SOURCES });
   
   const sourcesArray = Array.isArray(sources) ? sources : [];
   const apiSources = Array.isArray(apiSourcesData) ? apiSourcesData : [];
@@ -212,7 +213,7 @@ export default function SourcesPage() {
                       <td className="text-[var(--text-secondary)]">
                         <div className="flex items-center gap-2">
                           <Activity size={14} className="text-green-500" />
-                          {source.eps != null ? `${source.eps} EPS` : '—'}
+                          {(source.eps ?? source.events_per_second ?? 0)} EPS
                         </div>
                       </td>
                       <td className="text-right">
@@ -232,7 +233,7 @@ export default function SourcesPage() {
                             </div>
                             <div>
                               <div className="text-xs text-[var(--text-secondary)] uppercase font-semibold mb-1">Log Source App</div>
-                              <div className="text-sm font-mono text-xs bg-[var(--bg-secondary)] px-2 py-1 rounded inline-block">{source.source}</div>
+                              <div className="text-sm font-mono text-xs bg-[var(--bg-secondary)] px-2 py-1 rounded inline-block">{source.source || source.hostname || 'Endpoint Agent'}</div>
                             </div>
                             <div>
                               <div className="text-xs text-[var(--text-secondary)] uppercase font-semibold mb-1">Ingestion Protocol</div>
@@ -248,12 +249,12 @@ export default function SourcesPage() {
                             </div>
                             <div>
                               <div className="text-xs text-[var(--text-secondary)] uppercase font-semibold mb-1">Total Events</div>
-                              <div className="text-sm font-medium">{source.totalEvents.toLocaleString()}</div>
+                              <div className="text-sm font-medium">{(source.totalEvents ?? source.total_events ?? 0).toLocaleString()}</div>
                             </div>
                             <div>
                               <div className="text-xs text-[var(--text-secondary)] uppercase font-semibold mb-1">Last Seen</div>
                               <div className="text-sm text-[var(--text-secondary)]">
-                                {(() => { const d = source.lastSeen ? new Date(source.lastSeen) : null; return d && !isNaN(d.getTime()) ? formatDistanceToNow(d) + ' ago' : '—'; })()}
+                                {(() => { const raw = source.lastSeen || source.last_seen; const d = raw ? new Date(raw) : null; return d && !isNaN(d.getTime()) ? formatDistanceToNow(d) + ' ago' : 'Just now'; })()}
                               </div>
                             </div>
                           </div>

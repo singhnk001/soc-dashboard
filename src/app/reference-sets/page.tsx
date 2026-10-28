@@ -6,6 +6,7 @@ import { referenceSetsService } from '@/services/reference-sets.service';
 import { Database, Plus, Trash2, Search, X, Loader2, List, FileJson, Clock, User as UserIcon, Upload } from 'lucide-react';
 import { useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { DEMO_REFERENCE_SETS, DEMO_REFERENCE_ITEMS } from '@/lib/demo-data';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
   if (err instanceof Event) throw new Error("Network Event Error");
@@ -24,10 +25,10 @@ export default function ReferenceSetsPage() {
     return () => window.removeEventListener('refresh_interval_change', updateInterval);
   }, []);
 
-  const { data: setsData, mutate: mutateSets } = useSWR('/api/reference-sets', fetcher, { refreshInterval });
+  const { data: setsData, mutate: mutateSets } = useSWR('/api/reference-sets', fetcher, { refreshInterval, fallbackData: { data: DEMO_REFERENCE_SETS } });
   const sets = setsData?.data || [];
   
-  const [activeSetId, setActiveSetId] = useState<string | null>(null);
+  const [activeSetId, setActiveSetId] = useState<string | null>('ref-01');
   const { data: itemsData, mutate: mutateItems, isLoading: itemsLoading } = useSWR(
     activeSetId ? `/api/reference-sets/${activeSetId}/items` : null, 
     fetcher

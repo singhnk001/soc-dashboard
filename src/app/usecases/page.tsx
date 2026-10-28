@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { useCasesService } from '@/services/usecases.service';
 import { Loader2, Shield, Activity, Target, Zap, Plus, Trash2, Save } from 'lucide-react';
+import { DEMO_USECASES } from '@/lib/demo-data';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
   if (err instanceof Event) throw new Error("Network Event Error");
@@ -11,7 +12,7 @@ const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err =>
 });
 
 export default function UseCasesPage() {
-  const { data: useCases, isLoading } = useSWR('/api/usecases', fetcher);
+  const { data: useCases, isLoading } = useSWR('/api/usecases', fetcher, { fallbackData: DEMO_USECASES });
   const [isCreating, setIsCreating] = useState(false);
   const [role, setRole] = useState<string>('admin');
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { parsersService } from '@/services/parsers.service';
 import { Loader2, Code, Plus, Trash2, Save } from 'lucide-react';
+import { DEMO_PARSERS } from '@/lib/demo-data';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
   if (err instanceof Event) throw new Error("Network Event Error");
@@ -11,7 +12,7 @@ const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err =>
 });
 
 export default function ParsersPage() {
-  const { data: parsers, isLoading } = useSWR('/api/parsers', fetcher);
+  const { data: parsers, isLoading } = useSWR('/api/parsers', fetcher, { fallbackData: DEMO_PARSERS });
   const [isCreating, setIsCreating] = useState(false);
   const [role, setRole] = useState<string>('admin');
 

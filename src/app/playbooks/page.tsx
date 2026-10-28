@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { playbooksService } from '@/services/playbooks.service';
+import { DEMO_PLAYBOOKS, DEMO_PLAYBOOK_EXECUTIONS } from '@/lib/demo-data';
 import {
   Zap, Plus, Trash2, Play, ToggleLeft, ToggleRight,
   ChevronDown, ChevronUp, CheckCircle, XCircle, Clock,
@@ -472,8 +473,8 @@ function PlaybookCard({ pb, onDeleted, onTested }: { pb: Playbook; onDeleted: ()
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PlaybooksPage() {
-  const { data: playbooks, mutate: mutatePB } = useSWR<Playbook[]>('/api/playbooks', fetcher, { refreshInterval: 10000 });
-  const { data: executions, mutate: mutateExec } = useSWR<Execution[]>('/api/playbooks/executions?limit=30', fetcher, { refreshInterval: 5000 });
+  const { data: playbooks, mutate: mutatePB } = useSWR<Playbook[]>('/api/playbooks', fetcher, { refreshInterval: 10000, fallbackData: DEMO_PLAYBOOKS as any });
+  const { data: executions, mutate: mutateExec } = useSWR<Execution[]>('/api/playbooks/executions?limit=30', fetcher, { refreshInterval: 5000, fallbackData: DEMO_PLAYBOOK_EXECUTIONS as any });
   const [showForm, setShowForm] = useState(false);
   const [tab, setTab] = useState<'playbooks' | 'history'>('playbooks');
 

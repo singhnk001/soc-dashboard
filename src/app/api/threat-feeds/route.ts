@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { DEMO_THREAT_FEEDS } from '@/lib/demo-data';
+import { DEMO_THREAT_FEEDS, shouldProxy } from '@/lib/demo-data';
 
 export async function GET() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
+  if (!shouldProxy()) {
+    return NextResponse.json({ data: DEMO_THREAT_FEEDS });
+  }
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   try {
     const res = await fetch(`${apiUrl}/api/threat-feeds`, {
       signal: AbortSignal.timeout(2000),
@@ -11,9 +14,7 @@ export async function GET() {
     if (res.ok) {
       return NextResponse.json(await res.json());
     }
-  } catch {
-    // Fallback
-  }
+  } catch {}
   return NextResponse.json({ data: DEMO_THREAT_FEEDS });
 }
 

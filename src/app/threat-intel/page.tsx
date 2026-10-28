@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ShieldAlert, Check, X, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, Server, FileSearch, Globe, Code, Settings } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { threatIntelService, systemService } from "@/services";
+import { DEMO_THREAT_FEEDS, getDemoIndicatorsForFeed } from "@/lib/demo-data";
 
 export default function ThreatIntelPage() {
   const [activeTab, setActiveTab] = useState<'feeds' | 'lookup'>('feeds');
@@ -75,8 +76,24 @@ export default function ThreatIntelPage() {
   const fetchFeeds = async () => {
     try {
       const data = await threatIntelService.getFeeds();
-      setFeeds(data.data || []);
-    } catch (e) { console.error(e); } finally { setIsLoading(false); }
+      const feedList = (data && data.data && data.data.length > 0) ? data.data : (DEMO_THREAT_FEEDS as any[]);
+      setFeeds(feedList);
+      const initialIndicators: Record<string, any[]> = {};
+      feedList.forEach((f: any) => {
+        initialIndicators[f.id] = getDemoIndicatorsForFeed(f.id);
+      });
+      setIndicators(prev => ({ ...initialIndicators, ...prev }));
+    } catch (e) {
+      console.error(e);
+      setFeeds(DEMO_THREAT_FEEDS as any[]);
+      const initialIndicators: Record<string, any[]> = {};
+      DEMO_THREAT_FEEDS.forEach(f => {
+        initialIndicators[f.id] = getDemoIndicatorsForFeed(f.id);
+      });
+      setIndicators(prev => ({ ...initialIndicators, ...prev }));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fetchSettings = async () => {
@@ -128,14 +145,16 @@ export default function ThreatIntelPage() {
     } else {
       newExpanded.add(id);
       setExpandedRows(newExpanded);
-      if (!indicators[id]) {
+      if (!indicators[id] || indicators[id].length === 0) {
         setLoadingIndicators(prev => new Set(prev).add(id));
         try {
           const res = await fetch('/api/threat-feeds/' + id + '/indicators');
           const data = await res.json();
-          setIndicators(prev => (Object.assign({}, prev, { [id]: data.data })));
+          const items = (data && data.data && data.data.length > 0) ? data.data : getDemoIndicatorsForFeed(id);
+          setIndicators(prev => ({ ...prev, [id]: items }));
         } catch (e) {
           console.error(e);
+          setIndicators(prev => ({ ...prev, [id]: getDemoIndicatorsForFeed(id) }));
         } finally {
           setLoadingIndicators(prev => {
             const newSet = new Set(prev);
