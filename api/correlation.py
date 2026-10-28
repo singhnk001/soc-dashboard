@@ -32,15 +32,10 @@ from dotenv import load_dotenv
 load_dotenv()
 log = logging.getLogger("soc.correlation")
 
-# ── DB helpers ────────────────────────────────────────────────────────────────
+from api.core.config import settings
 
-DB_DSN = (
-    f"host={os.environ.get('DB_HOST','localhost')} "
-    f"port={os.environ.get('DB_PORT','5432')} "
-    f"user={os.environ.get('DB_USER','postgres')} "
-    f"password={os.environ.get('DB_PASSWORD','')} "
-    f"dbname={os.environ.get('DB_NAME','SOC_DB')}"
-)
+# ── DB helpers ────────────────────────────────────────────────────────────────
+DB_DSN = settings.db_conninfo
 
 
 def _get_conn():

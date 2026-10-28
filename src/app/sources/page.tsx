@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { sourcesService } from '@/services/sources.service';
 import { Loader2, Server, Cloud, ShieldCheck, AlertCircle, Plus, X, Box, Shield, CheckCircle, Edit, Trash2, ChevronDown, ChevronRight, Activity, Network } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -97,7 +98,7 @@ export default function SourcesPage() {
   const handleDeleteAgent = async (hostname: string) => {
     if (!confirm(`Are you sure you want to completely delete the agent ${hostname} and purge its logs?`)) return;
     try {
-      await fetch(`/api/sources/${hostname}`, { method: 'DELETE' });
+      await sourcesService.deleteSource(hostname);
       mutateSources();
     } catch (e) {
       console.error(e);
@@ -304,7 +305,7 @@ export default function SourcesPage() {
                     </td>
                     <td className="text-[var(--text-secondary)]">{new Date(src.created_at).toLocaleDateString()}</td>
                     <td className="text-right">
-                      <button onClick={async () => { if(confirm("Remove?")) { await fetch(`/api/api-sources/${src.id}`, {method:'DELETE'}); mutateApiSources(); } }} className="text-red-500 hover:text-red-400 text-xs font-medium">Remove</button>
+                      <button onClick={async () => { if(confirm("Remove?")) { await sourcesService.deleteApiSource(src.id); mutateApiSources(); } }} className="text-red-500 hover:text-red-400 text-xs font-medium">Remove</button>
                     </td>
                   </tr>
                 ))}

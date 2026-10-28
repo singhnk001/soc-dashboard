@@ -60,26 +60,41 @@ export function generateMockAlerts(count: number): Alert[] {
 }
 
 export function generateDashboardStats(): DashboardStats {
+  const logsByHour = Array.from({length: 24}).map((_, i) => ({
+    hour: `${i.toString().padStart(2, '0')}:00`,
+    count: Math.floor(Math.random() * 1000) + 100
+  }));
+  const topEventIds = [
+    { event_id: 4624, eventId: 4624, count: 4500, description: "Successful Logon" },
+    { event_id: 4688, eventId: 4688, count: 3200, description: "Process Creation" },
+    { event_id: 5156, eventId: 5156, count: 2100, description: "WFP Connection Permitted" }
+  ];
+  const severityDistribution = [
+    { severity: 'info', count: 10500 },
+    { severity: 'low', count: 3200 },
+    { severity: 'medium', count: 1500 },
+    { severity: 'high', count: 500 },
+    { severity: 'critical', count: 147 }
+  ];
   return {
+    total_logs: 15847,
     totalLogs: 15847,
+    total_alerts: 147,
+    critical_alerts: 23,
     criticalAlerts: 23,
+    new_alerts: 12,
+    active_sources: 12,
     activeSources: 12,
+    mitre_coverage: 68,
     mitreCoverage: 68,
-    logsByHour: Array.from({length: 24}).map((_, i) => ({
-      hour: `${i.toString().padStart(2, '0')}:00`,
-      count: Math.floor(Math.random() * 1000) + 100
-    })),
-    topEventIds: [
-      { eventId: 4624, count: 4500, description: "Successful Logon" },
-      { eventId: 4688, count: 3200, description: "Process Creation" },
-      { eventId: 5156, count: 2100, description: "WFP Connection Permitted" }
-    ],
-    severityDistribution: [
-      { severity: 'info', count: 10500 },
-      { severity: 'low', count: 3200 },
-      { severity: 'medium', count: 1500 },
-      { severity: 'high', count: 500 },
-      { severity: 'critical', count: 147 }
-    ]
+    eps: 42.5,
+    logs_by_hour: logsByHour,
+    logsByHour: logsByHour,
+    top_event_ids: topEventIds,
+    topEventIds: topEventIds,
+    severity_distribution: severityDistribution,
+    severityDistribution: severityDistribution,
+    top_sources: [{ source: 'Firewall', count: 1200 }],
+    topSources: [{ source: 'Firewall', count: 1200 }]
   };
 }

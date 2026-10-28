@@ -5,6 +5,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { ShieldAlert, Clock, CheckCircle2, List, Loader2, ThumbsUp, ThumbsDown, Save, ChevronDown, ChevronRight, Download, User } from 'lucide-react';
 import useSWR, { mutate } from 'swr';
 import TIEnrichment from '@/components/TIEnrichment';
+import { alertsService } from '@/services/alerts.service';
+import { SeverityBadge } from '@/components/common/SeverityBadge';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
   if (err instanceof Event) throw new Error("Network Event Error");
@@ -28,7 +30,7 @@ const statusBadge: Record<string, string> = {
 
 
 function AlertComments({ alertId }: { alertId: string }) {
-  const { data, mutate } = useSWR(`/api/alerts/${alertId}/comments`, url => fetch(url).then(r => r.json()));
+  const { data, mutate } = useSWR(`/api/alerts/${alertId}/comments`, () => alertsService.getComments(alertId));
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const comments = data?.data || [];
@@ -37,10 +39,9 @@ function AlertComments({ alertId }: { alertId: string }) {
     e.preventDefault();
     if (!comment.trim()) return;
     setSubmitting(true);
-    await fetch(`/api/alerts/${alertId}/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user: sessionStorage.getItem('soc_user') || 'Administrator', comment })
+    await alertsService.addComment(alertId, {
+      user: sessionStorage.getItem('soc_user') || 'Administrator',
+      comment
     });
     setComment('');
     setSubmitting(false);
@@ -114,10 +115,11 @@ export default function AlertsPage() {
   const updateStatus = async (alertId: string, newStatus: string, rType?: string, alertNotes?: string, assignedTo?: string) => {
     setIsSubmitting(true);
     try {
-      await fetch(`/api/alerts/${alertId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, resolution_type: rType, notes: alertNotes, assigned_to: assignedTo })
+      await alertsService.updateAlert(alertId, {
+        status: newStatus,
+        resolution_type: rType,
+        notes: alertNotes,
+        assigned_to: assignedTo
       });
       mutate((key) => typeof key === 'string' && (key.includes('/api/alerts') || key.includes('/api/stats')), undefined, { revalidate: true });
     } catch (e) { console.error(e); }
@@ -248,9 +250,7 @@ export default function AlertsPage() {
                       {expandedId === alert.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase ${severityBadge[alert.severity] || severityBadge.info}`}>
-                        {alert.severity}
-                      </span>
+                      <SeverityBadge severity={alert.severity} />
                     </td>
                     <td className="px-4 py-3 font-mono text-[var(--text-secondary)] text-xs">{alert.id.substring(0, 8)}</td>
                     <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-xs truncate">{alert.title}</td>

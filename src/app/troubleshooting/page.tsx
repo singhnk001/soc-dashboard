@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import useSWR from 'swr';
+import { systemService, sourcesService } from '@/services';
 import {
   Activity, Play, Square, RotateCw, Server, AlertCircle, Loader2,
   Cpu, HardDrive, Clock, Radio, Wifi, WifiOff, RefreshCw, Monitor,
@@ -98,11 +99,7 @@ export default function TroubleshootingPage() {
     if (!confirm(`${action === 'stop' ? '⚠️ Stop' : '▶ Start'} ${serviceId === 'vector-agent' ? 'VectorAgent Windows Service' : serviceId}?`)) return;
     setActingService(serviceId);
     try {
-      await fetch(`/api/system/services/${serviceId}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
+      await systemService.serviceAction(serviceId, action);
       setTimeout(() => { mutateSvc(); mutateAgents(); }, 1500);
     } catch {
       alert(`Failed to ${action} ${serviceId}`);

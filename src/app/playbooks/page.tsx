@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import useSWR, { mutate } from 'swr';
+import { playbooksService } from '@/services/playbooks.service';
 import {
   Zap, Plus, Trash2, Play, ToggleLeft, ToggleRight,
   ChevronDown, ChevronUp, CheckCircle, XCircle, Clock,
@@ -193,12 +194,13 @@ function PlaybookForm({ onSave, onCancel }: { onSave: () => void; onCancel: () =
     setSaving(true);
     setError('');
     try {
-      const res = await fetch('/api/playbooks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description: desc, trigger_severity: triggerSev, trigger_keyword: keyword, actions }),
+      await playbooksService.createPlaybook({
+        name,
+        description: desc,
+        trigger_severity: triggerSev as any,
+        trigger_keyword: keyword,
+        actions: actions as any,
       });
-      if (!res.ok) throw new Error(await res.text());
       mutate('/api/playbooks');
       onSave();
     } catch (e: unknown) {
@@ -354,17 +356,13 @@ function PlaybookCard({ pb, onDeleted, onTested }: { pb: Playbook; onDeleted: ()
   const [testResult, setTestResult] = useState<string | null>(null);
 
   const toggle = async () => {
-    await fetch(`/api/playbooks/${pb.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: !pb.enabled }),
-    });
+    await playbooksService.updatePlaybook(pb.id, { enabled: !pb.enabled });
     mutate('/api/playbooks');
   };
 
   const del = async () => {
     if (!confirm(`Delete playbook "${pb.name}"?`)) return;
-    await fetch(`/api/playbooks/${pb.id}`, { method: 'DELETE' });
+    await playbooksService.deletePlaybook(pb.id);
     onDeleted();
   };
 
@@ -372,8 +370,7 @@ function PlaybookCard({ pb, onDeleted, onTested }: { pb: Playbook; onDeleted: ()
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch(`/api/playbooks/${pb.id}/test`, { method: 'POST' });
-      const data = await res.json();
+      const data = await playbooksService.testPlaybook(pb.id);
       const passed = data.results?.filter((r: {status:string}) => r.status === 'success').length ?? 0;
       const total  = data.results?.length ?? 0;
       setTestResult(`${data.status} — ${passed}/${total} actions passed`);

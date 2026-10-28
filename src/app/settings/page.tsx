@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { authService } from '@/services/auth.service';
 import { Save, Shield, Monitor, ToggleLeft, ToggleRight, Users, UserPlus, Trash2, Key, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -209,7 +210,7 @@ export default function SettingsPage() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
-      await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      await authService.deleteUser(id);
       mutate();
     } catch (err) {
       console.error(err);

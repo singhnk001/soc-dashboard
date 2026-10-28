@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { logsService } from '@/services/logs.service';
 import {
   Search, RefreshCw, Download, ChevronLeft, ChevronRight,
   X, ChevronDown, AlertTriangle, Info, AlertCircle,
@@ -397,16 +398,32 @@ export default function LogsPage() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const res = await fetch(buildUrl());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json: ApiResponse = await res.json();
-      setData(json);
+      const advanced = filterRows.length > 0
+        ? JSON.stringify(
+            filterRows
+              .filter(r => r.value || r.op === 'is_null' || r.op === 'is_not_null')
+              .map(r => ({ field: r.field, op: r.op, value: r.value, logic: r.logic }))
+          )
+        : undefined;
+      const timeFrom = timePreset > 0
+        ? new Date(Date.now() - timePreset * 60 * 1000).toISOString().replace('Z', '+00:00')
+        : undefined;
+
+      const json = await logsService.getLogs({
+        page,
+        limit,
+        search: search || undefined,
+        severity: severity !== 'all' ? severity : undefined,
+        time_from: timeFrom,
+        filters: advanced,
+      });
+      setData(json as any);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [buildUrl]);
+  }, [page, limit, search, severity, timePreset, filterRows]);
 
   useEffect(() => { setPage(1); }, [search, severity, timePreset, filterRows, limit]);
   useEffect(() => { fetchLogs(); }, [fetchLogs]);

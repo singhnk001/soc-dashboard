@@ -26,14 +26,9 @@ load_dotenv()
 
 router = APIRouter()
 
-# ── DB connection ─────────────────────────────────────────────────────────────
-DB_DSN = (
-    f"host={os.environ.get('DB_HOST','localhost')} "
-    f"port={os.environ.get('DB_PORT','5432')} "
-    f"user={os.environ.get('DB_USER','postgres')} "
-    f"password={os.environ.get('DB_PASSWORD','')} "
-    f"dbname={os.environ.get('DB_NAME','SOC_DB')}"
-)
+from api.core.config import settings
+
+DB_DSN = settings.db_conninfo
 
 BATCH_SIZE = 500  # rows fetched per round-trip to Postgres
 

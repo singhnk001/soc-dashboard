@@ -5,16 +5,13 @@ import MitreHeatmap from '@/components/MitreHeatmap';
 import EventIdTable from '@/components/EventIdTable';
 import { MITRE_ATTACK_MAPPINGS, MITRE_TACTICS } from '@/lib/mitre-mapping';
 import useSWR from 'swr';
-import { Loader2 } from 'lucide-react';
-
-const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
-  if (err instanceof Event) throw new Error("Network Event Error");
-  throw err;
-});
+import { systemService } from '@/services/system.service';
+import { PageHeader } from '@/components/common/PageHeader';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 export default function MitrePage() {
   const allTechniques = MITRE_TACTICS.flatMap(t => t.techniques);
-  const { data: stats, isLoading } = useSWR('/api/stats', fetcher, { refreshInterval: 5000 });
+  const { data: stats, isLoading } = useSWR('/api/stats', () => systemService.getStats(), { refreshInterval: 5000 });
 
   // Convert API returned detected_techniques to the Record structure expected by the heatmap
   const activeDetections: Record<string, { count: number; severity: string }> = {};
@@ -30,15 +27,13 @@ export default function MitrePage() {
 
   return (
     <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
-      <div>
-        <h1 className="text-2xl font-bold">MITRE ATT&CK Framework</h1>
-        <p className="text-[var(--text-secondary)] text-sm mt-1">Mapping detections to adversarial tactics and techniques</p>
-      </div>
+      <PageHeader 
+        title="MITRE ATT&CK Framework"
+        description="Mapping detections to adversarial tactics and techniques"
+      />
 
       {isLoading ? (
-        <div className="py-12 flex justify-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg">
-          <Loader2 className="animate-spin text-blue-500" size={32} />
-        </div>
+        <LoadingSpinner message="Loading MITRE framework matrix..." />
       ) : (
         <MitreHeatmap 
           tactics={MITRE_TACTICS} 
@@ -55,4 +50,3 @@ export default function MitrePage() {
     </div>
   );
 }
-

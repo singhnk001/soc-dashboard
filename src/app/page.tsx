@@ -13,6 +13,9 @@ import TopSourcesChart from '@/components/TopSourcesChart';
 import MitreActivityChart from '@/components/MitreActivityChart';
 import AlertRateWidget from '@/components/AlertRateWidget';
 import { formatDistanceToNow } from 'date-fns';
+import { systemService, alertsService } from '@/services';
+import { SeverityBadge } from '@/components/common/SeverityBadge';
+import { DashboardStats } from '@/lib/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -94,7 +97,7 @@ function getStoredWidgets(): { id: WidgetId; visible: boolean }[] {
 // ── DashboardPage ─────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [stats, setStats]         = useState<StatsData | null>(null);
+  const [stats, setStats]         = useState<DashboardStats | null>(null);
   const [alerts, setAlerts]       = useState<AlertRow[]>([]);
   const [loading, setLoading]     = useState(true);
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
@@ -130,8 +133,8 @@ export default function DashboardPage() {
     setRefreshing(true);
     try {
       const [s, a] = await Promise.all([
-        fetch('/api/stats').then(r => r.json()),
-        fetch('/api/alerts?limit=6').then(r => r.json()),
+        systemService.getStats(),
+        alertsService.getAlerts({ limit: 6 }),
       ]);
       setStats(s);
       setAlerts(a?.data || []);
@@ -487,9 +490,7 @@ export default function DashboardPage() {
                   {alerts.map((alert) => (
                     <tr key={alert.id} className="hover:bg-[var(--bg-hover)]/30 transition-colors">
                       <td className="px-4 py-3">
-                        <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase ${SEV_BADGE[alert.severity] || SEV_BADGE.info}`}>
-                          {alert.severity}
-                        </span>
+                        <SeverityBadge severity={alert.severity} />
                       </td>
                       <td className="px-4 py-3 font-medium max-w-xs truncate">{alert.title}</td>
                       <td className="px-4 py-3">

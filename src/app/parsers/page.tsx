@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
+import { parsersService } from '@/services/parsers.service';
 import { Loader2, Code, Plus, Trash2, Save } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
@@ -69,10 +70,12 @@ export default function ParsersPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await fetch('/api/parsers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, active: true, log_source: formData.log_source || null })
+      await parsersService.createParser({
+        name: formData.name,
+        regex: formData.regex,
+        description: formData.description,
+        active: true,
+        log_source: formData.log_source || undefined,
       });
       mutate('/api/parsers');
       setIsCreating(false);
@@ -87,7 +90,7 @@ export default function ParsersPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`/api/parsers/${id}`, { method: 'DELETE' });
+      await parsersService.deleteParser(id);
       mutate('/api/parsers');
     } catch (e) {
       console.error(e);

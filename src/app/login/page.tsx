@@ -33,7 +33,7 @@ export default function LoginPage() {
     try {
       if (mfaRequired) {
         // Step 2: MFA Verification
-        const res = await fetch('http://127.0.0.1:8002/api/auth/login/mfa', {
+        const res = await fetch('/api/auth/login/mfa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: mfaUserId, code: mfaCode })
@@ -54,7 +54,7 @@ export default function LoginPage() {
         }
       } else {
         // Step 1: Initial Login
-        const res = await fetch('http://127.0.0.1:8002/api/auth/login', {
+        const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })

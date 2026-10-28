@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { referenceSetsService } from '@/services/reference-sets.service';
 import { Database, Plus, Trash2, Search, X, Loader2, List, FileJson, Clock, User as UserIcon, Upload } from 'lucide-react';
 import { useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
@@ -158,7 +159,7 @@ export default function ReferenceSetsPage() {
 
   const handleDeleteSet = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete the reference set "${name}" and all its contents?`)) return;
-    await fetch(`/api/reference-sets/${id}`, { method: 'DELETE' });
+    await referenceSetsService.deleteSet(id);
     if (activeSetId === id) setActiveSetId(null);
     mutateSets();
   };
@@ -182,7 +183,7 @@ export default function ReferenceSetsPage() {
 
   const handleDeleteItem = async (itemId: string) => {
     if (!activeSetId) return;
-    await fetch(`/api/reference-sets/${activeSetId}/items/${itemId}`, { method: 'DELETE' });
+    await referenceSetsService.deleteItem(activeSetId, itemId);
     mutateItems();
     mutateSets();
   };

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
+import { useCasesService } from '@/services/usecases.service';
 import { Loader2, Shield, Activity, Target, Zap, Plus, Trash2, Save } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
@@ -35,17 +36,18 @@ export default function UseCasesPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await fetch('/api/usecases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...formData,
-          event_id: formData.event_id || null,
-          mitre_technique: formData.mitre_technique || null,
-          rule_logic: (formData as any).rule_logic_arr && (formData as any).rule_logic_arr.length > 0 
-                      ? JSON.stringify((formData as any).rule_logic_arr) : null,
-          active: true 
-        })
+      await useCasesService.createUseCase({
+        title: formData.title,
+        description: formData.description,
+        type: formData.type as 'threshold' | 'match' | 'sequence',
+        event_id: formData.event_id || undefined,
+        mitre_technique: formData.mitre_technique || undefined,
+        threshold_count: formData.threshold_count,
+        severity: formData.severity,
+        active: true,
+        rule_logic: (formData as any).rule_logic_arr && (formData as any).rule_logic_arr.length > 0
+          ? JSON.stringify((formData as any).rule_logic_arr)
+          : undefined,
       });
       mutate('/api/usecases');
       setIsCreating(false);
@@ -59,7 +61,7 @@ export default function UseCasesPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`/api/usecases/${id}`, { method: 'DELETE' });
+      await useCasesService.deleteUseCase(id);
       mutate('/api/usecases');
     } catch (e) {
       console.error(e);

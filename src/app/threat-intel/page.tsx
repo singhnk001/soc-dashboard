@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ShieldAlert, Check, X, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, Server, FileSearch, Globe, Code, Settings } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { threatIntelService, systemService } from "@/services";
 
 export default function ThreatIntelPage() {
   const [activeTab, setActiveTab] = useState<'feeds' | 'lookup'>('feeds');
@@ -73,8 +74,7 @@ export default function ThreatIntelPage() {
 
   const fetchFeeds = async () => {
     try {
-      const res = await fetch('/api/threat-feeds');
-      const data = await res.json();
+      const data = await threatIntelService.getFeeds();
       setFeeds(data.data || []);
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
@@ -98,8 +98,7 @@ export default function ThreatIntelPage() {
 
   const fetchCommunityStatus = async () => {
     try {
-      const res = await fetch('/api/community-feeds/status');
-      const data = await res.json();
+      const data = await threatIntelService.getCommunityStatus();
       if (data.status === 'success') setCommunityStatus(data.data || {});
     } catch (e) {}
   };
