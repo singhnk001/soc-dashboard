@@ -193,7 +193,7 @@ export default function UseCasesPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-mono bg-[var(--bg-hover)] px-2 py-1 rounded text-[var(--text-secondary)]">{uc.id}</span>
-                  {role !== 'readonly' && role !== 'l1' && (
+                  {(true) && (
                     <button onClick={() => handleDelete(uc.id)} className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16}/></button>
                   )}
                 </div>

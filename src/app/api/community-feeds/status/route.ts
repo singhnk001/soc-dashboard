@@ -4,30 +4,42 @@ import { shouldProxy } from '@/lib/demo-data';
 const STATUS_DATA = {
   status: 'success',
   data: {
-    alienvault: {
-      last_updated: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
-      indicator_count: 5240,
-      status: 'synced',
+    threatfox: {
+      last_updated: new Date(Date.now() - 3600 * 1000 * 3).toISOString(),
+      indicator_count: 2450,
+      status: 'Active',
+      imported: false,
     },
     urlhaus: {
       last_updated: new Date(Date.now() - 3600 * 1000).toISOString(),
       indicator_count: 3120,
-      status: 'synced',
+      status: 'Active',
+      imported: false,
     },
-    threatfox: {
-      last_updated: new Date(Date.now() - 3600 * 1000 * 3).toISOString(),
-      indicator_count: 2450,
-      status: 'synced',
+    'cisa-kev': {
+      last_updated: new Date(Date.now() - 86400 * 1000).toISOString(),
+      indicator_count: 1120,
+      status: 'Active',
+      imported: false,
     },
     cisa: {
       last_updated: new Date(Date.now() - 86400 * 1000).toISOString(),
       indicator_count: 1120,
-      status: 'synced',
+      status: 'Active',
+      imported: false,
     },
     abuseipdb: {
       last_updated: new Date(Date.now() - 3600 * 1000 * 4).toISOString(),
       indicator_count: 4890,
-      status: 'synced',
+      status: 'Active',
+      imported: false,
+      key_configured: true,
+    },
+    alienvault: {
+      last_updated: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
+      indicator_count: 5240,
+      status: 'Active',
+      imported: true,
     },
   },
 };

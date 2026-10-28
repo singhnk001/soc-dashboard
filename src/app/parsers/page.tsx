@@ -105,7 +105,7 @@ export default function ParsersPage() {
           <h1 className="text-2xl font-bold">Custom Log Parsers</h1>
           <p className="text-[var(--text-secondary)] text-sm mt-1">Define Regex patterns with named capture groups to extract key=value fields from raw logs.</p>
         </div>
-        {role !== 'readonly' && role !== 'l1' && (
+        {(true) && (
         <button 
           onClick={() => setIsCreating(true)}
           className="bg-blue-600 hover:bg-blue-700 text-[var(--text-primary)] px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
@@ -232,7 +232,7 @@ export default function ParsersPage() {
                   </div>
                   <h3 className="text-lg font-bold">{parser.name}</h3>
                 </div>
-                {role !== 'readonly' && role !== 'l1' && (
+                {(true) && (
                 <button 
                   onClick={() => handleDelete(parser.id)}
                   className="text-gray-500 hover:text-red-500 transition-colors p-1"

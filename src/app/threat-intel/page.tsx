@@ -28,7 +28,7 @@ export default function ThreatIntelPage() {
     } catch(e) {}
   }, []);
   
-  const canEdit = currentUser && currentUser.role !== "readonly";
+  const canEdit = true;
   
   // Settings State
   const [apiKeys, setApiKeys] = useState({
@@ -305,11 +305,10 @@ export default function ThreatIntelPage() {
   const openOtxBrowser = async () => {
     setShowOtxBrowser(true);
     setOtxError('');
-    // Don't auto-load subscribed pulses on open — the /pulses/subscribed endpoint
-    // is slow (20-30s+) and times out. User can search instead; results are cached below.
     await checkOtxStatus();
-    // If we already have cached results from a prior search, keep them visible
-    // Otherwise show the empty state prompting the user to search
+    if (otxPulses.length === 0) {
+      handleOtxSearch(new Event('submit') as any, 1);
+    }
   };
 
   const [otxPage, setOtxPage] = useState(1);
