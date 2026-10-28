@@ -11,13 +11,21 @@ import json
 from datetime import datetime, timedelta
 
 def seed_default_users(cursor):
-    """Seed initial default administrator and read-only analyst accounts."""
-    count = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if count == 0:
+    """Seed initial default administrator and read-only analyst/demo accounts."""
+    cursor.execute("SELECT id FROM users WHERE username = 'demo'")
+    if not cursor.fetchone():
+        cursor.execute(
+            "INSERT INTO users (id, username, password, role, real_name, status) VALUES (%s, %s, %s, %s, %s, %s)",
+            (str(uuid.uuid4()), 'demo', 'demo123', 'readonly', 'Demo Analyst (Read-Only)', 'Active')
+        )
+    cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+    if not cursor.fetchone():
         cursor.execute(
             "INSERT INTO users (id, username, password, role, real_name, status) VALUES (%s, %s, %s, %s, %s, %s)",
             (str(uuid.uuid4()), 'admin', 'Singhnk.001k', 'admin', 'Administrator', 'Active')
         )
+    cursor.execute("SELECT id FROM users WHERE username = 'readonly'")
+    if not cursor.fetchone():
         cursor.execute(
             "INSERT INTO users (id, username, password, role, real_name, status) VALUES (%s, %s, %s, %s, %s, %s)",
             (str(uuid.uuid4()), 'readonly', 'readonly@123', 'readonly', 'Read Only User', 'Active')

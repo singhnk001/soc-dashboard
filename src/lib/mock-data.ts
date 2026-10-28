@@ -98,3 +98,5 @@ export function generateDashboardStats(): DashboardStats {
     topSources: [{ source: 'Firewall', count: 1200 }]
   };
 }
+
+export { generateMockLogs as generateLogs, generateMockAlerts as generateAlerts };

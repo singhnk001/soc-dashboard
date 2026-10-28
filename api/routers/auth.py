@@ -18,6 +18,20 @@ router = APIRouter(tags=["Authentication & Users"])
 
 @router.post("/api/auth/login")
 def login(req: LoginRequest):
+    # Built-in demo user with read-only privileges
+    if req.username.lower() in ("demo", "demouser") and req.password in ("demo123", "demo"):
+        return {
+            "status": "success",
+            "user": {
+                "id": "demo-readonly-account",
+                "username": "demo",
+                "role": "readonly",
+                "status": "Active",
+                "real_name": "Demo Analyst (Read-Only)",
+                "mfa_enabled": False
+            }
+        }
+
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(

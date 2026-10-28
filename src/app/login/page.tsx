@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Lock, User, AlertCircle, KeyRound } from 'lucide-react';
+import { Shield, Lock, User, AlertCircle, KeyRound, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +13,8 @@ export default function LoginPage() {
   
   // MFA States
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaUserId, setMfaUserId] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
 
   // Clear stale session data on mount
   React.useEffect(() => {
@@ -22,13 +24,39 @@ export default function LoginPage() {
     sessionStorage.removeItem("soc_real_name");
   }, []);
 
-  const [mfaUserId, setMfaUserId] = useState('');
-  const [mfaCode, setMfaCode] = useState('');
+  const handleDemoLogin = () => {
+    setIsLoading(true);
+    setError('');
+    const demoUser = {
+      id: 'demo-readonly-001',
+      username: 'demo',
+      real_name: 'Demo Analyst (Read-Only)',
+      role: 'readonly',
+      status: 'Active',
+      mfa_enabled: false,
+    };
+    sessionStorage.setItem('user', JSON.stringify(demoUser));
+    sessionStorage.setItem('soc_user', demoUser.username);
+    sessionStorage.setItem('soc_real_name', demoUser.real_name);
+    sessionStorage.setItem('soc_role', demoUser.role);
+    sessionStorage.setItem('soc_login_time', Date.now().toString());
+    document.cookie = `soc_session=${demoUser.role}; path=/`;
+    router.push('/');
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+
+    // Instant client-side check for demo credentials
+    if (
+      username.trim().toLowerCase() === 'demo' &&
+      (password === 'demo123' || password === 'demo')
+    ) {
+      handleDemoLogin();
+      return;
+    }
 
     try {
       if (mfaRequired) {
@@ -36,7 +64,7 @@ export default function LoginPage() {
         const res = await fetch('/api/auth/login/mfa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: mfaUserId, code: mfaCode })
+          body: JSON.stringify({ user_id: mfaUserId, token: mfaCode }),
         });
         
         const data = await res.json();
@@ -57,7 +85,7 @@ export default function LoginPage() {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username, password }),
         });
         
         const data = await res.json();
@@ -71,7 +99,7 @@ export default function LoginPage() {
             sessionStorage.setItem('soc_user', data.user.username);
             sessionStorage.setItem('soc_real_name', data.user.real_name);
             sessionStorage.setItem('soc_role', data.user.role);
-          sessionStorage.setItem('soc_login_time', Date.now().toString());
+            sessionStorage.setItem('soc_login_time', Date.now().toString());
             document.cookie = `soc_session=${data.user.role}; path=/`;
             router.push('/');
           }
@@ -79,8 +107,13 @@ export default function LoginPage() {
           setError(data.detail || 'Invalid credentials');
         }
       }
-    } catch (err) {
-      setError('An error occurred during authentication');
+    } catch {
+      // If network/backend is unavailable (e.g. standalone Vercel preview), allow demo fallback
+      if (username.trim().toLowerCase() === 'demo') {
+        handleDemoLogin();
+        return;
+      }
+      setError('Server unreachable. Click "1-Click Demo Login" below for instant read-only access.');
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +128,9 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">SOC Dashboard</h1>
           <p className="text-[var(--text-secondary)] mt-2 text-sm text-center">
-            {mfaRequired ? 'Enter the 6-digit code from your Authenticator app' : 'Sign in to access the Security Operations Center'}
+            {mfaRequired
+              ? 'Enter the 6-digit code from your Authenticator app'
+              : 'Sign in to access the Security Operations Center'}
           </p>
         </div>
 
@@ -106,11 +141,13 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-5">
           {!mfaRequired ? (
             <>
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Username</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  Username
+                </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                   <input
@@ -119,13 +156,15 @@ export default function LoginPage() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg pl-10 pr-4 py-3 text-[var(--text-primary)] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
-                    placeholder="admin"
+                    placeholder="demo or admin"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Password</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  Password
+                </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                   <input
@@ -134,14 +173,16 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg pl-10 pr-4 py-3 text-[var(--text-primary)] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
-                    placeholder="????????"
+                    placeholder="••••••••"
                   />
                 </div>
               </div>
             </>
           ) : (
             <div className="animate-in slide-in-from-right-8 duration-300">
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Authenticator Code</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Authenticator Code
+              </label>
               <div className="relative">
                 <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500" />
                 <input
@@ -161,24 +202,49 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-[var(--text-primary)] font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : mfaRequired ? 'Verify & Sign In' : 'Sign In'}
+            ) : mfaRequired ? (
+              'Verify & Sign In'
+            ) : (
+              'Sign In'
+            )}
           </button>
           
           {mfaRequired && (
             <button
               type="button"
               onClick={() => { setMfaRequired(false); setMfaCode(''); setError(''); }}
-              className="w-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition-colors mt-4"
+              className="w-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition-colors mt-2"
             >
               Back to Password
             </button>
           )}
         </form>
 
+        {/* Demo Account Callout */}
+        <div className="mt-6 pt-5 border-t border-[var(--border-color)]">
+          <div className="bg-blue-500/10 border border-blue-500/25 rounded-lg p-3 text-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold text-blue-400 flex items-center gap-1.5">
+                <Sparkles size={14} className="text-blue-400" />
+                Demo Account (Read-Only)
+              </div>
+              <div className="text-[var(--text-secondary)] mt-0.5">
+                User: <code className="bg-black/30 px-1 py-0.5 rounded text-gray-200">demo</code> &nbsp;|&nbsp; Pass: <code className="bg-black/30 px-1 py-0.5 rounded text-gray-200">demo123</code>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-medium px-3.5 py-1.5 rounded-md transition-all whitespace-nowrap shadow-sm hover:shadow text-xs"
+            >
+              1-Click Demo Login
+            </button>
+          </div>
+        </div>
 
       </div>
     </div>
