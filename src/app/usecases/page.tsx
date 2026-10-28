@@ -4,7 +4,10 @@ import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { Loader2, Shield, Activity, Target, Zap, Plus, Trash2, Save } from 'lucide-react';
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
+  if (err instanceof Event) throw new Error("Network Event Error");
+  throw err;
+});
 
 export default function UseCasesPage() {
   const { data: useCases, isLoading } = useSWR('/api/usecases', fetcher);
@@ -64,42 +67,42 @@ export default function UseCasesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-[#0f1219] min-h-screen text-white">
+    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Detection Engine Rules</h1>
-          <p className="text-gray-400 text-sm mt-1">Active rules and threshold configurations running on the SOC engine</p>
+          <p className="text-[var(--text-secondary)] text-sm mt-1">Active rules and threshold configurations running on the SOC engine</p>
         </div>
         <button 
           onClick={() => setIsCreating(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          className="bg-blue-600 hover:bg-blue-700 text-[var(--text-primary)] px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
         >
           <Plus size={18} /> New Rule
         </button>
       </div>
 
       {isCreating && (
-        <form onSubmit={handleSubmit} className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-5 mb-6">
+        <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 mb-6">
           <h3 className="text-lg font-bold mb-4">Create Custom Detection Rule</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-400 mb-1">Rule Title</label>
-              <input required type="text" className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Rule Title</label>
+              <input required type="text" className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
-              <input type="text" className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Description</label>
+              <input type="text" className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Rule Type</label>
-              <select className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Rule Type</label>
+              <select className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
                 <option value="match">Exact Match</option>
                 <option value="threshold">Threshold (Multiple occurrences)</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Severity</label>
-              <select className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={formData.severity} onChange={e => setFormData({...formData, severity: e.target.value})}>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Severity</label>
+              <select className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none" value={formData.severity} onChange={e => setFormData({...formData, severity: e.target.value})}>
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
@@ -107,31 +110,31 @@ export default function UseCasesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Target Event ID (Optional)</label>
-              <input type="text" placeholder="e.g. 4625" className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={formData.event_id} onChange={e => setFormData({...formData, event_id: e.target.value})} />
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Target Event ID (Optional)</label>
+              <input type="text" placeholder="e.g. 4625" className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none" value={formData.event_id} onChange={e => setFormData({...formData, event_id: e.target.value})} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">MITRE Technique (Optional)</label>
-              <input type="text" placeholder="e.g. T1110" className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={formData.mitre_technique} onChange={e => setFormData({...formData, mitre_technique: e.target.value})} />
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">MITRE Technique (Optional)</label>
+              <input type="text" placeholder="e.g. T1110" className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none" value={formData.mitre_technique} onChange={e => setFormData({...formData, mitre_technique: e.target.value})} />
             </div>
             {formData.type === 'threshold' && (
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Threshold Count</label>
-                <input required type="number" min="2" className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none" value={formData.threshold_count} onChange={e => setFormData({...formData, threshold_count: parseInt(e.target.value)})} />
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Threshold Count</label>
+                <input required type="number" min="2" className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none" value={formData.threshold_count} onChange={e => setFormData({...formData, threshold_count: parseInt(e.target.value)})} />
               </div>
             )}
-            <div className="md:col-span-2 mt-4 pt-4 border-t border-gray-800">
-              <label className="block text-sm font-medium text-gray-400 mb-2">Advanced Parser Rules (Key-Value Matching)</label>
+            <div className="md:col-span-2 mt-4 pt-4 border-t border-[var(--border-color)]">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Advanced Parser Rules (Key-Value Matching)</label>
               <div className="space-y-2">
                 {(formData as any).rule_logic_arr?.map((rule: any, i: number) => (
-                  <div key={i} className="flex gap-2 items-center bg-[#11141e] p-2 rounded border border-gray-700">
-                    <input type="text" placeholder="Attribute (e.g. srcip)" className="flex-1 bg-transparent border-none outline-none text-sm text-white" value={rule.attribute} 
+                  <div key={i} className="flex gap-2 items-center bg-[var(--bg-secondary)] p-2 rounded border border-[var(--border-color)]">
+                    <input type="text" placeholder="Attribute (e.g. srcip)" className="flex-1 bg-transparent border-none outline-none text-sm text-[var(--text-primary)]" value={rule.attribute} 
                       onChange={e => {
                         const newArr = [...((formData as any).rule_logic_arr || [])];
                         newArr[i].attribute = e.target.value;
                         setFormData({...formData, rule_logic_arr: newArr} as any);
                       }} />
-                    <select className="w-32 bg-[#0f1219] border border-gray-600 rounded text-sm text-white outline-none" value={rule.operator}
+                    <select className="w-32 bg-[var(--bg-secondary)] border border-gray-600 rounded text-sm text-[var(--text-primary)] outline-none" value={rule.operator}
                       onChange={e => {
                         const newArr = [...((formData as any).rule_logic_arr || [])];
                         newArr[i].operator = e.target.value;
@@ -143,7 +146,7 @@ export default function UseCasesPage() {
                       <option value="CONTAINS">CONTAINS</option>
                       <option value="NOT CONTAINS">NOT CONTAINS</option>
                     </select>
-                    <input type="text" placeholder="Value" className="flex-1 bg-transparent border-none outline-none text-sm text-white" value={rule.value} 
+                    <input type="text" placeholder="Value" className="flex-1 bg-transparent border-none outline-none text-sm text-[var(--text-primary)]" value={rule.value} 
                       onChange={e => {
                         const newArr = [...((formData as any).rule_logic_arr || [])];
                         newArr[i].value = e.target.value;
@@ -164,9 +167,9 @@ export default function UseCasesPage() {
               </div>
             </div>
           </div>
-          <div className="flex gap-2 justify-end pt-4 mt-4 border-t border-gray-800">
-            <button type="button" onClick={() => setIsCreating(false)} className="px-4 py-2 text-gray-400 hover:text-white transition-colors">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors disabled:opacity-50">
+          <div className="flex gap-2 justify-end pt-4 mt-4 border-t border-[var(--border-color)]">
+            <button type="button" onClick={() => setIsCreating(false)} className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-[var(--text-primary)] px-4 py-2 rounded flex items-center gap-2 transition-colors disabled:opacity-50">
               <Save size={16} /> Deploy Rule
             </button>
           </div>
@@ -174,19 +177,19 @@ export default function UseCasesPage() {
       )}
 
       {isLoading ? (
-        <div className="py-12 flex justify-center bg-[#1a1f2e] border border-gray-800 rounded-lg">
+        <div className="py-12 flex justify-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg">
           <Loader2 className="animate-spin text-blue-500" size={32} />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {useCases?.map((uc: any) => (
-            <div key={uc.id} className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-5 hover:border-blue-500/50 transition-colors flex flex-col group">
+            <div key={uc.id} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 hover:border-blue-500/50 transition-colors flex flex-col group">
               <div className="flex justify-between items-start mb-4">
                 <div className="bg-blue-500/10 p-2 rounded-lg text-blue-400">
                   <Shield size={20} />
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono bg-gray-800 px-2 py-1 rounded text-gray-300">{uc.id}</span>
+                  <span className="text-xs font-mono bg-[var(--bg-hover)] px-2 py-1 rounded text-[var(--text-secondary)]">{uc.id}</span>
                   {role !== 'readonly' && role !== 'l1' && (
                     <button onClick={() => handleDelete(uc.id)} className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16}/></button>
                   )}
@@ -194,12 +197,12 @@ export default function UseCasesPage() {
               </div>
               
               <h3 className="text-lg font-bold mb-2">{uc.title}</h3>
-              <p className="text-gray-400 text-sm mb-4 flex-grow">{uc.description}</p>
+              <p className="text-[var(--text-secondary)] text-sm mb-4 flex-grow">{uc.description}</p>
               
-              <div className="space-y-3 mt-auto pt-4 border-t border-gray-800">
+              <div className="space-y-3 mt-auto pt-4 border-t border-[var(--border-color)]">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500 flex items-center gap-2"><Activity size={14} /> Type</span>
-                  <span className="text-white capitalize">{uc.type} Rule</span>
+                  <span className="text-[var(--text-primary)] capitalize">{uc.type} Rule</span>
                 </div>
                 {uc.type === 'threshold' && (
                   <div className="flex items-center justify-between text-sm">

@@ -1,34 +1,73 @@
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+dist/
+build/
+
+# Python
 __pycache__/
 *.py[cod]
-*.egg-info/
+*.pyo
+*.pyd
+.Python
+*.pyc
+.venv/
+venv/
+env/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
+# Environment secrets — NEVER commit
 .env
-.env*.local
+.env.*
+!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# debug
-npm-debug.log*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# Database
+# Database files
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/*.log
+api/*.log
+vector/**/*.log
+vector/data/collect_errors.log
+
+# Vector runtime state and large binaries (downloaded via script)
+vector/bin/
+vector/data/
+vector/data2/
+vector/data3/
+vector_data/
+
+# Build artifacts
+tsconfig.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Test artifacts
+pytest_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Misc
+*.zip
+replay_edits.json

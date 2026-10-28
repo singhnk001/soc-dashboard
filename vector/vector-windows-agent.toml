@@ -1,0 +1,9 @@
+data_dir = "D:\\SOC-Dashboard\\Dashboard\\vector\\data"
+
+[api]
+enabled = true
+address  = "127.0.0.1:8686"
+
+# The locked VectorAgent Windows service uses this file.
+# Sources/sinks intentionally removed — the active collector
+# runs from vector-soc-collector.toml as a separate process.

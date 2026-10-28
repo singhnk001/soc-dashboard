@@ -55,13 +55,13 @@ export default function AlertCard({ alert }: AlertCardProps) {
   };
 
   return (
-    <div className={`bg-[#1a1f2e] border border-gray-800 rounded-lg overflow-hidden flex relative transition-colors`}>
+    <div className={`bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden flex relative transition-colors`}>
       <div className={`w-1.5 ${severityColors[alert.severity].split(' ')[0]}`} />
       <div className="p-4 flex-grow flex flex-col">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <h4 className="text-white font-medium text-lg">{alert.title}</h4>
-            <span className="text-sm text-gray-400">Source: {alert.source} • {formatDistanceToNow(new Date(alert.timestamp))} ago</span>
+            <h4 className="text-[var(--text-primary)] font-medium text-lg">{alert.title}</h4>
+            <span className="text-sm text-[var(--text-secondary)]">Source: {alert.source} • {formatDistanceToNow(new Date(alert.timestamp))} ago</span>
           </div>
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[alert.status].color}`}>
             {statusConfig[alert.status].pulse && (
@@ -74,21 +74,21 @@ export default function AlertCard({ alert }: AlertCardProps) {
             <span className="capitalize">{alert.status.replace('_', ' ')}</span>
           </div>
         </div>
-        <p className="text-gray-300 text-sm mb-4">{alert.description}</p>
+        <p className="text-[var(--text-secondary)] text-sm mb-4">{alert.description}</p>
         
         {/* If resolved, show notes */}
         {(alert.status === 'resolved' || alert.status === 'false_positive') && (alert.resolution_type || alert.notes) && (
-           <div className="mb-4 p-3 bg-gray-900/50 border border-gray-800 rounded text-sm">
-             <div className="text-gray-400 uppercase text-xs font-bold mb-1">Resolution Notes</div>
+           <div className="mb-4 p-3 bg-[var(--bg-secondary)]/50 border border-[var(--border-color)] rounded text-sm">
+             <div className="text-[var(--text-secondary)] uppercase text-xs font-bold mb-1">Resolution Notes</div>
              {alert.resolution_type && (
                <div className="mb-1">
-                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${alert.resolution_type === 'true_positive' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${alert.resolution_type === 'true_positive' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-[var(--text-secondary)]'}`}>
                    {alert.resolution_type === 'true_positive' ? <ThumbsUp size={12}/> : <ThumbsDown size={12}/>}
                    {alert.resolution_type === 'true_positive' ? 'True Positive' : 'False Positive'}
                  </span>
                </div>
              )}
-             {alert.notes && <div className="text-gray-300 whitespace-pre-wrap">{alert.notes}</div>}
+             {alert.notes && <div className="text-[var(--text-secondary)] whitespace-pre-wrap">{alert.notes}</div>}
            </div>
         )}
 
@@ -104,17 +104,17 @@ export default function AlertCard({ alert }: AlertCardProps) {
                 
                 {alert.extracted_fields && (
                   <div>
-                    <div className="text-gray-400 mb-1 font-medium text-[10px] uppercase tracking-wider">Extracted Key-Value Pairs</div>
-                    <div className="bg-[#11141e] border border-gray-800 rounded p-0 overflow-hidden">
+                    <div className="text-[var(--text-secondary)] mb-1 font-medium text-[10px] uppercase tracking-wider">Extracted Key-Value Pairs</div>
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-0 overflow-hidden">
                       <table className="w-full text-xs text-left">
                         <tbody className="divide-y divide-gray-800/50">
                           {(() => {
                             try {
                               const parsed = JSON.parse(alert.extracted_fields);
                               return Object.entries(parsed).map(([k, v], i) => (
-                                <tr key={i} className="hover:bg-gray-800/50">
+                                <tr key={i} className="hover:bg-[var(--bg-hover)]/50">
                                   <td className="px-3 py-1.5 text-blue-400/80 font-mono align-top w-1/3">{k}</td>
-                                  <td className="px-3 py-1.5 text-gray-300 font-mono break-all">{String(v)}</td>
+                                  <td className="px-3 py-1.5 text-[var(--text-secondary)] font-mono break-all">{String(v)}</td>
                                 </tr>
                               ));
                             } catch(e) { return null; }
@@ -127,8 +127,8 @@ export default function AlertCard({ alert }: AlertCardProps) {
 
                 {alert.raw_log && (
                   <div>
-                    <div className="text-gray-400 mb-1 font-medium text-[10px] uppercase tracking-wider">Raw Payload</div>
-                    <div className="p-3 bg-[#11141e] border border-gray-800 rounded text-xs font-mono text-green-400/80 overflow-x-auto whitespace-pre-wrap h-full max-h-48 overflow-y-auto shadow-inner">
+                    <div className="text-[var(--text-secondary)] mb-1 font-medium text-[10px] uppercase tracking-wider">Raw Payload</div>
+                    <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-xs font-mono text-green-400/80 overflow-x-auto whitespace-pre-wrap h-full max-h-48 overflow-y-auto shadow-inner">
                       {(() => {
                         try {
                           return JSON.stringify(JSON.parse(alert.raw_log), null, 2);
@@ -151,30 +151,30 @@ export default function AlertCard({ alert }: AlertCardProps) {
             <div className="flex gap-2 mb-3">
               <button 
                 onClick={() => setResolutionType('true_positive')}
-                className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded text-sm transition-colors border ${resolutionType === 'true_positive' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded text-sm transition-colors border ${resolutionType === 'true_positive' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-[var(--bg-hover)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-gray-200'}`}
               >
                 <ThumbsUp size={14} /> True Positive
               </button>
               <button 
                 onClick={() => setResolutionType('false_positive')}
-                className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded text-sm transition-colors border ${resolutionType === 'false_positive' ? 'bg-gray-600/50 border-gray-500/50 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded text-sm transition-colors border ${resolutionType === 'false_positive' ? 'bg-gray-600/50 border-gray-500/50 text-[var(--text-primary)]' : 'bg-[var(--bg-hover)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-gray-200'}`}
               >
                 <ThumbsDown size={14} /> False Positive
               </button>
             </div>
             <textarea
-              className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-sm text-white mb-2 focus:outline-none focus:border-blue-500"
+              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-primary)] mb-2 focus:outline-none focus:border-blue-500"
               placeholder="Investigation notes..."
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setIsResolving(false)} className="text-xs text-gray-400 hover:text-white px-3 py-1.5">Cancel</button>
+              <button onClick={() => setIsResolving(false)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-3 py-1.5">Cancel</button>
               <button 
                 onClick={() => updateStatus(resolutionType === 'true_positive' ? 'resolved' : 'false_positive', resolutionType, notes)} 
                 disabled={isSubmitting}
-                className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded flex items-center gap-1 disabled:opacity-50"
+                className="text-xs bg-blue-600 hover:bg-blue-700 text-[var(--text-primary)] px-3 py-1.5 rounded flex items-center gap-1 disabled:opacity-50"
               >
                 <Save size={14} /> Save & Close
               </button>
@@ -182,10 +182,10 @@ export default function AlertCard({ alert }: AlertCardProps) {
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-800">
+        <div className="flex items-center justify-between mt-auto pt-2 border-t border-[var(--border-color)]">
           <div className="flex gap-2">
             {alert.mitreRef && (
-              <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded border border-gray-700">
+              <span className="text-xs bg-[var(--bg-hover)] text-[var(--text-secondary)] px-2 py-1 rounded border border-[var(--border-color)]">
                 {alert.mitreRef}
               </span>
             )}
@@ -206,7 +206,7 @@ export default function AlertCard({ alert }: AlertCardProps) {
             {!isResolving && (alert.status === 'new' || alert.status === 'investigating') && (
               <button 
                 onClick={() => setIsResolving(true)}
-                className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition-colors"
+                className="text-xs bg-gray-700 hover:bg-gray-600 text-[var(--text-primary)] px-3 py-1.5 rounded transition-colors"
               >
                 Resolve Alert
               </button>

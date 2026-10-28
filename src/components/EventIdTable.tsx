@@ -20,24 +20,24 @@ export default function EventIdTable({ mappings, tactics }: EventIdTableProps) {
   });
 
   return (
-    <div className="bg-[#1a1f2e] border border-gray-800 rounded-lg overflow-hidden flex flex-col">
-      <div className="p-4 border-b border-gray-800 flex flex-col sm:flex-row gap-4 justify-between items-center bg-[#1e2436]">
-        <h3 className="text-white font-medium">Windows Event ID Reference</h3>
+    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden flex flex-col">
+      <div className="p-4 border-b border-[var(--border-color)] flex flex-col sm:flex-row gap-4 justify-between items-center bg-[#1e2436]">
+        <h3 className="text-[var(--text-primary)] font-medium">Windows Event ID Reference</h3>
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
             <input 
               type="text" 
               placeholder="Search Event IDs or description..." 
-              className="w-full bg-[#11141e] border border-gray-700 text-white text-sm rounded-md pl-9 pr-3 py-2 focus:outline-none focus:border-blue-500"
+              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] text-sm rounded-md pl-9 pr-3 py-2 focus:outline-none focus:border-blue-500"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">
-            <Filter size={16} className="text-gray-400" />
+            <Filter size={16} className="text-[var(--text-secondary)]" />
             <select 
-              className="bg-[#11141e] border border-gray-700 text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-blue-500 max-w-[200px]"
+              className="bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] text-sm rounded-md px-3 py-2 focus:outline-none focus:border-blue-500 max-w-[200px]"
               value={tacticFilter}
               onChange={(e) => setTacticFilter(e.target.value)}
             >
@@ -49,8 +49,8 @@ export default function EventIdTable({ mappings, tactics }: EventIdTableProps) {
       </div>
 
       <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-        <table className="w-full text-left text-sm text-gray-300">
-          <thead className="bg-[#151a27] text-gray-400 sticky top-0 z-10">
+        <table className="w-full text-left text-sm text-[var(--text-secondary)]">
+          <thead className="bg-[#151a27] text-[var(--text-secondary)] sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 font-medium">Event ID</th>
               <th className="px-4 py-3 font-medium">Platform</th>
@@ -62,8 +62,8 @@ export default function EventIdTable({ mappings, tactics }: EventIdTableProps) {
           </thead>
           <tbody>
             {filteredMappings.map((mapping) => (
-              <tr key={`${mapping.platform}-${mapping.eventId}`} className="border-b border-gray-800 hover:bg-[#202636] transition-colors">
-                <td className="px-4 py-3 font-mono font-medium text-white">{mapping.eventId}</td>
+              <tr key={`${mapping.platform}-${mapping.eventId}`} className="border-b border-[var(--border-color)] hover:bg-[#202636] transition-colors">
+                <td className="px-4 py-3 font-mono font-medium text-[var(--text-primary)]">{mapping.eventId}</td>
                 <td className="px-4 py-3 capitalize">{mapping.platform}</td>
                 <td className="px-4 py-3">{tactics.find(t => t.id === mapping.tacticId)?.name || mapping.tacticId}</td>
                 <td className="px-4 py-3 font-mono text-xs">{mapping.techniqueId}</td>

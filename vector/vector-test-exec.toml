@@ -1,0 +1,13 @@
+data_dir = "D:\\SOC-Dashboard\\Dashboard\\vector\\data3"
+
+[sources.test_exec]
+type = "exec"
+mode = "scheduled"
+command = ["powershell", "-NonInteractive", "-Command", "echo test_event"]
+scheduled.exec_interval_secs = 3
+decoding.codec = "bytes"
+
+[sinks.drop]
+type = "blackhole"
+inputs = ["test_exec"]
+print_interval_secs = 5

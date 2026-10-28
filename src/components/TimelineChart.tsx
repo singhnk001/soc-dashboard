@@ -14,8 +14,8 @@ interface TimelineChartProps {
 
 export default function TimelineChart({ data }: TimelineChartProps) {
   return (
-    <div className="h-[300px] w-full bg-[#1a1f2e] border border-gray-800 rounded-lg p-4">
-      <h3 className="text-white text-lg font-medium mb-4">Log Volume (24h)</h3>
+    <div className="h-[300px] w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-4">
+      <h3 className="text-[var(--text-primary)] text-lg font-medium mb-4">Log Volume (24h)</h3>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>

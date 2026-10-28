@@ -7,7 +7,10 @@ import { MITRE_ATTACK_MAPPINGS, MITRE_TACTICS } from '@/lib/mitre-mapping';
 import useSWR from 'swr';
 import { Loader2 } from 'lucide-react';
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
+  if (err instanceof Event) throw new Error("Network Event Error");
+  throw err;
+});
 
 export default function MitrePage() {
   const allTechniques = MITRE_TACTICS.flatMap(t => t.techniques);
@@ -26,14 +29,14 @@ export default function MitrePage() {
   }
 
   return (
-    <div className="p-6 space-y-6 bg-[#0f1219] min-h-screen text-white">
+    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
       <div>
         <h1 className="text-2xl font-bold">MITRE ATT&CK Framework</h1>
-        <p className="text-gray-400 text-sm mt-1">Mapping detections to adversarial tactics and techniques</p>
+        <p className="text-[var(--text-secondary)] text-sm mt-1">Mapping detections to adversarial tactics and techniques</p>
       </div>
 
       {isLoading ? (
-        <div className="py-12 flex justify-center bg-[#1a1f2e] border border-gray-800 rounded-lg">
+        <div className="py-12 flex justify-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg">
           <Loader2 className="animate-spin text-blue-500" size={32} />
         </div>
       ) : (

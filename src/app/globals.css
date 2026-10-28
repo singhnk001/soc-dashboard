@@ -4,16 +4,33 @@
   --bg-primary: #0a0e1a;
   --bg-secondary: #111827;
   --bg-card: #1a1f2e;
-  --text-primary: #e5e7eb;
+  --bg-hover: #1f2937;
+  --border-color: #1f2937;
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  
   --accent-blue: #3b82f6;
   --accent-red: #ef4444;
   --accent-yellow: #f59e0b;
   --accent-green: #22c55e;
 }
 
+.light-theme {
+  --bg-primary: #f3f4f6;
+  --bg-secondary: #e5e7eb;
+  --bg-card: #ffffff;
+  --bg-hover: #d1d5db;
+  --border-color: #d1d5db;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  cursor: default;
 }
 
 /* Custom Scrollbar */
@@ -27,25 +44,19 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: var(--text-muted);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  background: var(--text-secondary);
 }
 
 /* Pulse Animation for Alerts */
 @keyframes pulse-alert {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
 .alert-pulse {
@@ -63,25 +74,41 @@ body {
   color: var(--text-primary);
   padding: 12px;
   text-align: left;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .soc-table td {
   padding: 12px;
-  border-bottom: 1px solid #1f2937;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .soc-table tr:hover {
-  background-color: #1f2937;
-}
-.light-mode-hack {
-  filter: invert(1) hue-rotate(180deg);
+  background-color: var(--bg-hover);
 }
 
-.light-mode-hack img, .light-mode-hack svg {
-  filter: invert(1) hue-rotate(180deg);
+input, textarea, select {
+  cursor: text;
 }
 
-.light-mode-hack .alert-pulse {
-  animation: none;
+button, a {
+  cursor: pointer;
+}
+
+/* Input Field Styles for Playbooks */
+.input-field {
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+/* Ensure select options have dark backgrounds */
+select.input-field option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }

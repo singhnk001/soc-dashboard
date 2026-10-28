@@ -1,0 +1,75 @@
+data_dir = "D:\\SOC-Dashboard\\Dashboard\\vector\\data3"
+
+[api]
+enabled = true
+address  = "127.0.0.1:8687"
+
+[sources.win_security]
+type = "exec"
+mode = "scheduled"
+command = ["powershell.exe","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File","D:\\SOC-Dashboard\\Dashboard\\vector\\collect-events3.ps1","-Channel","Security","-StateFile","D:\\SOC-Dashboard\\Dashboard\\vector\\data3\\state_Security.txt"]
+scheduled.exec_interval_secs = 5
+decoding.codec = "bytes"
+
+[sources.win_system]
+type = "exec"
+mode = "scheduled"
+command = ["powershell.exe","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File","D:\\SOC-Dashboard\\Dashboard\\vector\\collect-events3.ps1","-Channel","System","-StateFile","D:\\SOC-Dashboard\\Dashboard\\vector\\data3\\state_System.txt"]
+scheduled.exec_interval_secs = 5
+decoding.codec = "bytes"
+
+[sources.win_application]
+type = "exec"
+mode = "scheduled"
+command = ["powershell.exe","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File","D:\\SOC-Dashboard\\Dashboard\\vector\\collect-events3.ps1","-Channel","Application","-StateFile","D:\\SOC-Dashboard\\Dashboard\\vector\\data3\\state_Application.txt"]
+scheduled.exec_interval_secs = 5
+decoding.codec = "bytes"
+
+[sources.win_powershell]
+type = "exec"
+mode = "scheduled"
+command = ["powershell.exe","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File","D:\\SOC-Dashboard\\Dashboard\\vector\\collect-events3.ps1","-Channel","Microsoft-Windows-PowerShell/Operational","-StateFile","D:\\SOC-Dashboard\\Dashboard\\vector\\data3\\state_PowerShell.txt"]
+scheduled.exec_interval_secs = 10
+decoding.codec = "bytes"
+
+[sources.win_defender]
+type = "exec"
+mode = "scheduled"
+command = ["powershell.exe","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File","D:\\SOC-Dashboard\\Dashboard\\vector\\collect-events3.ps1","-Channel","Microsoft-Windows-Windows Defender/Operational","-StateFile","D:\\SOC-Dashboard\\Dashboard\\vector\\data3\\state_Defender.txt"]
+scheduled.exec_interval_secs = 10
+decoding.codec = "bytes"
+
+[sources.win_taskscheduler]
+type = "exec"
+mode = "scheduled"
+command = ["powershell.exe","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File","D:\\SOC-Dashboard\\Dashboard\\vector\\collect-events3.ps1","-Channel","Microsoft-Windows-TaskScheduler/Operational","-StateFile","D:\\SOC-Dashboard\\Dashboard\\vector\\data3\\state_TaskScheduler.txt"]
+scheduled.exec_interval_secs = 10
+decoding.codec = "bytes"
+
+[transforms.parse_logs]
+type   = "remap"
+inputs = ["win_security","win_system","win_application","win_powershell","win_defender","win_taskscheduler"]
+source = '''
+  .message = string!(.message)
+  parsed, err = parse_json(.message)
+  if err == null {
+    . = merge!(., parsed)
+  }
+  del(.source_type)
+'''
+
+[sinks.http_soc]
+type    = "http"
+inputs  = ["parse_logs"]
+uri     = "http://127.0.0.1:8002/api/logs/ingest"
+method  = "post"
+encoding.codec = "json"
+framing.method = "newline_delimited"
+
+[sinks.http_soc.batch]
+max_events   = 50
+timeout_secs = 1
+
+[sinks.http_soc.request]
+retry_attempts = 5
+retry_initial_backoff_secs = 1

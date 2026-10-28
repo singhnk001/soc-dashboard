@@ -4,7 +4,10 @@ import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { Loader2, Code, Plus, Trash2, Save } from 'lucide-react';
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
+  if (err instanceof Event) throw new Error("Network Event Error");
+  throw err;
+});
 
 export default function ParsersPage() {
   const { data: parsers, isLoading } = useSWR('/api/parsers', fetcher);
@@ -92,16 +95,16 @@ export default function ParsersPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-[#0f1219] min-h-screen text-white">
+    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Custom Log Parsers</h1>
-          <p className="text-gray-400 text-sm mt-1">Define Regex patterns with named capture groups to extract key=value fields from raw logs.</p>
+          <p className="text-[var(--text-secondary)] text-sm mt-1">Define Regex patterns with named capture groups to extract key=value fields from raw logs.</p>
         </div>
         {role !== 'readonly' && role !== 'l1' && (
         <button 
           onClick={() => setIsCreating(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          className="bg-blue-600 hover:bg-blue-700 text-[var(--text-primary)] px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
         >
           <Plus size={18} /> New Parser
         </button>
@@ -109,41 +112,41 @@ export default function ParsersPage() {
       </div>
 
       {isCreating && (
-        <form onSubmit={handleSubmit} className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-5 mb-6">
+        <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 mb-6">
           <h3 className="text-lg font-bold mb-4">Create New Parser</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Parser Name</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Parser Name</label>
               <input 
                 required type="text" 
                 placeholder="e.g., Nginx Access Logs"
-                className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none"
                 value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Regex Pattern (Use named groups like <code className="text-blue-400">(?P&lt;ip&gt;\d+\.\d+\.\d+\.\d+)</code>)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Regex Pattern (Use named groups like <code className="text-blue-400">(?P&lt;ip&gt;\d+\.\d+\.\d+\.\d+)</code>)</label>
               <input 
                 required type="text" 
                 placeholder={`(?P<src_ip>\\d+\\.\\d+\\.\\d+\\.\\d+) - - \\[.*\\] "(?P<method>\\w+).*`}
-                className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white font-mono text-sm focus:border-blue-500 outline-none"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] font-mono text-sm focus:border-blue-500 outline-none"
                 value={formData.regex} onChange={e => setFormData({...formData, regex: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Description (Optional)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Description (Optional)</label>
               <input 
                 type="text" 
                 placeholder="Extracts source IP and HTTP method from Nginx logs"
-                className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none"
                 value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Target Log Source (Optional)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Target Log Source (Optional)</label>
               <select 
-                className="w-full bg-[#11141e] border border-gray-700 rounded p-2 text-white focus:border-blue-500 outline-none"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] focus:border-blue-500 outline-none"
                 value={formData.log_source} onChange={e => setFormData({...formData, log_source: e.target.value})}
               >
                 <option value="">Any Log Source (Global Parser)</option>
@@ -156,19 +159,19 @@ export default function ParsersPage() {
           </div>
 
           {/* Live Parser Tester */}
-          <div className="space-y-4 border-l border-gray-800 pl-6">
+          <div className="space-y-4 border-l border-[var(--border-color)] pl-6">
               <div>
                 <label className="block text-sm font-medium text-blue-400 mb-1 flex items-center gap-2">
                   <Code size={16} /> Live Parser Validator
                 </label>
                 <textarea 
                   placeholder="Paste a sample raw log here (e.g. XML, Syslog) to test your regex..."
-                  className="w-full h-32 bg-[#11141e] border border-gray-700 rounded p-2 text-white font-mono text-xs focus:border-blue-500 outline-none resize-none"
+                  className="w-full h-32 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-[var(--text-primary)] font-mono text-xs focus:border-blue-500 outline-none resize-none"
                   value={sampleLog} onChange={e => setSampleLog(e.target.value)}
                 />
               </div>
               
-              <div className="h-48 bg-[#0a0e1a] border border-gray-800 rounded p-3 overflow-y-auto">
+              <div className="h-48 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded p-3 overflow-y-auto">
                 {!sampleLog || !formData.regex ? (
                   <div className="h-full flex items-center justify-center text-gray-500 text-sm text-center">
                     Enter a regex pattern and a sample log to see live extraction results.
@@ -185,7 +188,7 @@ export default function ParsersPage() {
                         {testResult?.data && Object.entries(testResult.data).map(([k, v]) => (
                           <tr key={k}>
                             <td className="py-1 text-blue-400 pr-4">{k}</td>
-                            <td className="py-1 text-gray-300 break-all">{v}</td>
+                            <td className="py-1 text-[var(--text-secondary)] break-all">{v}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -196,9 +199,9 @@ export default function ParsersPage() {
             </div>
           </div>
           
-          <div className="flex gap-2 justify-end pt-4 mt-4 border-t border-gray-800">
-            <button type="button" onClick={() => { setIsCreating(false); setSampleLog(''); }} className="px-4 py-2 text-gray-400 hover:text-white transition-colors">Cancel</button>
-            <button type="submit" disabled={isSubmitting || !!testResult?.error} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors disabled:opacity-50">
+          <div className="flex gap-2 justify-end pt-4 mt-4 border-t border-[var(--border-color)]">
+            <button type="button" onClick={() => { setIsCreating(false); setSampleLog(''); }} className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">Cancel</button>
+            <button type="submit" disabled={isSubmitting || !!testResult?.error} className="bg-green-600 hover:bg-green-700 text-[var(--text-primary)] px-4 py-2 rounded flex items-center gap-2 transition-colors disabled:opacity-50">
               <Save size={16} /> Save Parser
             </button>
           </div>
@@ -206,18 +209,18 @@ export default function ParsersPage() {
       )}
 
       {isLoading ? (
-        <div className="py-12 flex justify-center bg-[#1a1f2e] border border-gray-800 rounded-lg">
+        <div className="py-12 flex justify-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg">
           <Loader2 className="animate-spin text-blue-500" size={32} />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {parsers?.length === 0 && !isCreating && (
-            <div className="col-span-full p-8 text-center text-gray-500 bg-[#1a1f2e] border border-gray-800 rounded-lg">
+            <div className="col-span-full p-8 text-center text-gray-500 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg">
               No custom parsers defined. Create one to start extracting fields automatically!
             </div>
           )}
           {parsers?.map((parser: any) => (
-            <div key={parser.id} className="bg-[#1a1f2e] border border-gray-800 rounded-lg p-5 flex flex-col">
+            <div key={parser.id} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 flex flex-col">
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-2">
                   <div className="bg-purple-500/10 p-2 rounded-lg text-purple-400">
@@ -236,7 +239,7 @@ export default function ParsersPage() {
                 )}
               </div>
               
-              {parser.description && <p className="text-gray-400 text-sm mb-4">{parser.description}</p>}
+              {parser.description && <p className="text-[var(--text-secondary)] text-sm mb-4">{parser.description}</p>}
               
               {parser.log_source ? (
                 <div className="mb-4">
@@ -246,13 +249,13 @@ export default function ParsersPage() {
                 </div>
               ) : (
                 <div className="mb-4">
-                  <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded">Global Parser (All Sources)</span>
+                  <span className="text-xs bg-[var(--bg-hover)] text-[var(--text-secondary)] px-2 py-1 rounded">Global Parser (All Sources)</span>
                 </div>
               )}
               
               <div className="mt-auto">
                 <div className="text-xs text-gray-500 mb-1">Regex Pattern</div>
-                <div className="bg-[#11141e] border border-gray-700 rounded p-3 font-mono text-sm text-green-400 overflow-x-auto whitespace-nowrap">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-3 font-mono text-sm text-green-400 overflow-x-auto whitespace-nowrap">
                   {parser.regex}
                 </div>
               </div>

@@ -10,6 +10,8 @@ export interface LogEntry {
   mitreAttackId?: string;
   mitreTactic?: string;
   mitreTechnique?: string;
+  sourceIp?: string;
+  destinationIp?: string;
   rawLog: string;
 }
 

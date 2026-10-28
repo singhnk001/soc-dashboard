@@ -1,0 +1,106 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Vector Syslog Collector — Network Devices & Linux Hosts
+# Run this ON the SOC Dashboard server (or a dedicated collector).
+# Listens on UDP 514 (syslog) and TCP 514 (reliable syslog).
+#
+# Configure your devices to send syslog here:
+#   Palo Alto:  Device > Server Profiles > Syslog > add collector IP
+#   Fortinet:   Log & Report > Log Settings > Syslog > enable, set IP
+#   Cisco IOS:  logging host <collector-ip>  /  logging trap informational
+#   Linux:      /etc/rsyslog.conf → *.* @<collector-ip>:514
+#
+# Install (Linux):  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
+# Run:              vector --config vector-syslog-collector.toml
+#
+# On Windows (run on dashboard server):
+#   winget install Datadog.Vector
+#   vector --config vector-syslog-collector.toml
+# ─────────────────────────────────────────────────────────────────────────────
+
+[api]
+enabled = true
+address  = "0.0.0.0:8686"
+
+# ── Sources ───────────────────────────────────────────────────────────────────
+
+# UDP syslog — firewalls, switches, routers (standard syslog)
+[sources.syslog_udp]
+type    = "syslog"
+address = "0.0.0.0:514"
+mode    = "udp"
+
+# TCP syslog — Linux servers, reliable delivery
+[sources.syslog_tcp]
+type    = "syslog"
+address = "0.0.0.0:514"
+mode    = "tcp"
+
+# Linux host file tailing (optional — deploy on Linux hosts)
+# Uncomment to collect /var/log/auth.log, /var/log/syslog etc.
+# [sources.linux_files]
+# type              = "file"
+# include           = ["/var/log/auth.log", "/var/log/syslog", "/var/log/secure"]
+# read_from         = "beginning"
+# ignore_older_secs = 86400
+
+# ── Transform: normalise to SOC Dashboard schema ──────────────────────────────
+
+[transforms.normalise_syslog]
+type   = "remap"
+inputs = ["syslog_udp", "syslog_tcp"]
+source = '''
+  # Severity mapping from syslog severity numbers
+  .severity = if exists(.severity) {
+    sev = downcase(string!(.severity))
+    if sev == "emerg" || sev == "alert" || sev == "crit" || sev == "err" {
+      "High"
+    } else if sev == "warning" || sev == "notice" {
+      "Medium"
+    } else {
+      "Low"
+    }
+  } else {
+    "Medium"
+  }
+
+  # Core fields
+  .log_type = "Syslog"
+  .source   = string(.appname) ?? string(.facility) ?? "syslog"
+  .hostname = string(.hostname) ?? string(.host) ?? "unknown"
+  .message  = string(.message) ?? ""
+
+  # Keep facility and priority as context
+  .facility = string(.facility) ?? ""
+  .priority = to_int(.priority) ?? 0
+'''
+
+# ── Transform: normalise Linux file logs (if file source enabled) ─────────────
+# [transforms.normalise_linux_files]
+# type   = "remap"
+# inputs = ["linux_files"]
+# source = '''
+#   .log_type = "Linux Syslog"
+#   .source   = "file"
+#   .hostname = get_hostname!()
+#   .message  = string!(.message)
+#   .severity = if match(string!(.message), r'error|fail|critical|denied') { "High" }
+#               else if match(string!(.message), r'warn') { "Medium" }
+#               else { "Low" }
+# '''
+
+# ── Sink: POST to SOC Dashboard ───────────────────────────────────────────────
+
+[sinks.soc_dashboard]
+type                          = "http"
+inputs                        = ["normalise_syslog"]
+uri                           = "http://127.0.0.1:8001/api/logs/ingest"  # Change if dashboard is on another host
+method                        = "post"
+encoding.codec                = "ndjson"
+batch.max_events              = 200
+batch.timeout_secs            = 3
+request.retry_attempts        = 10
+request.retry_initial_backoff_secs = 1
+healthcheck.enabled           = false
+
+[sinks.soc_dashboard.request.headers]
+Content-Type = "application/x-ndjson"

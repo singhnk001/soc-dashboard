@@ -24,8 +24,8 @@ export default function SeverityChart({ data }: SeverityChartProps) {
   const total = data.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <div className="h-[300px] w-full bg-[#1a1f2e] border border-gray-800 rounded-lg p-4 flex flex-col">
-      <h3 className="text-white text-lg font-medium mb-4">Events by Severity</h3>
+    <div className="h-[300px] w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-4 flex flex-col">
+      <h3 className="text-[var(--text-primary)] text-lg font-medium mb-4">Events by Severity</h3>
       <div className="flex-grow relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -51,8 +51,8 @@ export default function SeverityChart({ data }: SeverityChartProps) {
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
-            <span className="text-2xl font-bold text-white">{total}</span>
-            <span className="block text-xs text-gray-400">Total</span>
+            <span className="text-2xl font-bold text-[var(--text-primary)]">{total}</span>
+            <span className="block text-xs text-[var(--text-secondary)]">Total</span>
           </div>
         </div>
       </div>

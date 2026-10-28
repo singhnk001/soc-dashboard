@@ -11,10 +11,34 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => {
+    if (pathname !== '/login' && !sessionStorage.getItem('soc_user')) {
+      document.cookie = 'soc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+      router.push('/login');
+    }
+  }, [pathname, router]);
+
   
-  const fetcher = (url: string) => fetch(url).then(res => res.json());
-  const { data: alerts } = useSWR('/api/alerts', fetcher, { refreshInterval: 10000 });
-  const newAlertsCount = alerts?.items?.filter((a: any) => a.status === 'new').length || 0;
+  const isLoginPage = pathname === '/login';
+
+  const fetcher = (url: string) => fetch(url).then(res => {
+    if (!res.ok) return null;
+    return res.json().catch(() => null);
+  });
+  // Only poll alerts when NOT on the login page — avoids 500 errors before auth
+  const { data: alerts } = useSWR(isLoginPage ? null : '/api/alerts', fetcher, { refreshInterval: 10000 });
+  const newAlertsCount = alerts?.data?.filter((a: any) => a.status === 'new').length || alerts?.items?.filter((a: any) => a.status === 'new').length || 0;
+  const [prevCount, setPrevCount] = useState(0);
+  useEffect(() => {
+    if (newAlertsCount > prevCount) {
+      if (localStorage.getItem('soc_audio_enabled') === 'true') {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.play().catch(e => console.log('Audio autoplay prevented'));
+      }
+    }
+    setPrevCount(newAlertsCount);
+  }, [newAlertsCount, prevCount]);
+
   const [currentTime, setCurrentTime] = useState<string>('');
   const [role, setRole] = useState<string>('');
   
@@ -22,20 +46,20 @@ export default function Header() {
 
   const handleLogout = () => {
     document.cookie = 'soc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-    localStorage.removeItem('soc_user');
-    localStorage.removeItem('soc_real_name');
-    localStorage.removeItem('soc_role');
+    sessionStorage.removeItem('soc_user');
+    sessionStorage.removeItem('soc_real_name');
+    sessionStorage.removeItem('soc_role');
     router.push('/login');
   };
 
   const [timeLeft, setTimeLeft] = useState<number>(90);
 
   useEffect(() => {
-    const configuredTimeout = parseInt(localStorage.getItem('soc_idle_timeout') || '90', 10);
-    setTimeLeft(configuredTimeout);
+    const getTimeoutSeconds = () => parseInt(localStorage.getItem('soc_idle_timeout') || '30', 10) * 60;
+    setTimeLeft(getTimeoutSeconds());
     
     let timer: NodeJS.Timeout;
-    const resetTimer = () => setTimeLeft(configuredTimeout);
+    const resetTimer = () => setTimeLeft(getTimeoutSeconds());
 
     const tick = () => {
       setTimeLeft(prev => {
@@ -51,12 +75,12 @@ export default function Header() {
     
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'soc_idle_timeout') {
-        const newTimeout = parseInt(e.newValue || '90', 10);
+        const newTimeout = parseInt(e.newValue || '30', 10) * 60;
         setTimeLeft(newTimeout);
       }
     };
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('idle_timeout_change', () => { setTimeLeft(parseInt(localStorage.getItem('soc_idle_timeout') || '90', 10)); });
+    window.addEventListener('idle_timeout_change', () => { setTimeLeft(parseInt(localStorage.getItem('soc_idle_timeout') || '30', 10) * 60); });
     
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
     events.forEach(e => document.addEventListener(e, resetTimer));
@@ -83,7 +107,7 @@ export default function Header() {
       if (match) return decodeURIComponent(match[2]);
       return null;
     };
-    setRole(localStorage.getItem('soc_role') || 'ERROR_PLEASE_HARD_REFRESH_LOGIN_PAGE');
+    setRole(sessionStorage.getItem('soc_role') || 'ERROR_PLEASE_HARD_REFRESH_LOGIN_PAGE');
     
 
     return () => clearInterval(interval);
@@ -101,48 +125,34 @@ export default function Header() {
   if (pathname === '/login') return null;
 
   return (
-    <header className="h-16 bg-[#1a1f2e] border-b border-gray-800 flex items-center justify-between px-6 shrink-0 relative z-10">
-      <h1 className="text-xl font-semibold text-white">{getPageTitle()}</h1>
+    <header className="h-16 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-6 shrink-0 relative z-10">
+      <h1 className="text-xl font-semibold text-[var(--text-primary)] select-none cursor-default">{getPageTitle()}</h1>
       
       <div className="flex items-center gap-6">
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && searchQuery.trim()) {
-                router.push(`/logs?search=${encodeURIComponent(searchQuery.trim())}`);
-              }
-            }}
-            placeholder="Search logs, alerts, hosts..." 
-            className="pl-10 pr-4 py-2 bg-[#11141e] border border-gray-700 rounded-md text-sm text-white focus:outline-none focus:border-blue-500 w-64 transition-colors"
-          />
-        </div>
 
-        <div className="flex items-center gap-2 px-3 py-1 bg-gray-800/50 rounded text-xs font-mono text-gray-400">
+
+        <div className="flex items-center gap-2 px-3 py-1 bg-[var(--bg-hover)]/50 rounded text-xs font-mono text-[var(--text-secondary)] select-none cursor-default">
           <Timer size={14} className={timeLeft < 15 ? 'text-red-500 animate-pulse' : 'text-gray-500'} />
           <span className={timeLeft < 15 ? 'text-red-500' : ''}>
             {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
           </span>
         </div>
-        <div className="text-sm text-gray-400 hidden sm:block font-mono">
+        <div className="text-sm text-[var(--text-secondary)] hidden sm:block font-mono select-none cursor-default">
           {currentTime}
         </div>
 
-        <Link href="/alerts" className="relative text-gray-400 hover:text-white transition-colors">
+        <Link href="/alerts" className="relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
           <Bell size={20} />
           {newAlertsCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-[var(--text-primary)] flex items-center justify-center font-bold">
               {newAlertsCount}
             </span>
           )}
         </Link>
 
-        <div className="flex items-center gap-3 border-l border-gray-800 pl-6">
-          <div className="flex flex-col items-end hidden sm:flex">
-            <span className="text-sm font-medium text-white">
+        <div className="flex items-center gap-3 border-l border-[var(--border-color)] pl-6">
+          <div className="flex flex-col items-end hidden sm:flex select-none cursor-default">
+            <span className="text-sm font-medium text-[var(--text-primary)]">
               {role === 'admin' ? 'Administrator' : role === 'l3' ? 'L3 Analyst' : role === 'l2' ? 'L2 Analyst' : role === 'l1' ? 'L1 Analyst' : role === 'readonly' ? 'Read Only' : role}
             </span>
             <span className="text-[10px] text-blue-400 font-mono uppercase bg-blue-500/10 px-1.5 rounded">{role} Access</span>

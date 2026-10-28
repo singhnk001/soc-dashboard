@@ -16,10 +16,10 @@ export default function LoginPage() {
 
   // Clear stale session data on mount
   React.useEffect(() => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("soc_user");
-    localStorage.removeItem("soc_role");
-    localStorage.removeItem("soc_real_name");
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("soc_user");
+    sessionStorage.removeItem("soc_role");
+    sessionStorage.removeItem("soc_real_name");
   }, []);
 
   const [mfaUserId, setMfaUserId] = useState('');
@@ -33,7 +33,7 @@ export default function LoginPage() {
     try {
       if (mfaRequired) {
         // Step 2: MFA Verification
-        const res = await fetch('/api/auth/login/mfa', {
+        const res = await fetch('http://127.0.0.1:8002/api/auth/login/mfa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: mfaUserId, code: mfaCode })
@@ -42,10 +42,11 @@ export default function LoginPage() {
         const data = await res.json();
         
         if (res.ok && data.status === 'success') {
-          localStorage.setItem('user', JSON.stringify(data.user));
-          localStorage.setItem('soc_user', data.user.username);
-          localStorage.setItem('soc_real_name', data.user.real_name);
-          localStorage.setItem('soc_role', data.user.role);
+          sessionStorage.setItem('user', JSON.stringify(data.user));
+          sessionStorage.setItem('soc_user', data.user.username);
+          sessionStorage.setItem('soc_real_name', data.user.real_name);
+          sessionStorage.setItem('soc_role', data.user.role);
+          sessionStorage.setItem('soc_login_time', Date.now().toString());
           document.cookie = `soc_session=${data.user.role}; path=/`;
           router.push('/');
         } else {
@@ -53,7 +54,7 @@ export default function LoginPage() {
         }
       } else {
         // Step 1: Initial Login
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch('http://127.0.0.1:8002/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
@@ -66,10 +67,11 @@ export default function LoginPage() {
             setMfaRequired(true);
             setMfaUserId(data.user_id);
           } else if (data.status === 'success') {
-            localStorage.setItem('user', JSON.stringify(data.user));
-            localStorage.setItem('soc_user', data.user.username);
-            localStorage.setItem('soc_real_name', data.user.real_name);
-            localStorage.setItem('soc_role', data.user.role);
+            sessionStorage.setItem('user', JSON.stringify(data.user));
+            sessionStorage.setItem('soc_user', data.user.username);
+            sessionStorage.setItem('soc_real_name', data.user.real_name);
+            sessionStorage.setItem('soc_role', data.user.role);
+          sessionStorage.setItem('soc_login_time', Date.now().toString());
             document.cookie = `soc_session=${data.user.role}; path=/`;
             router.push('/');
           }
@@ -85,14 +87,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-[#1a1f2e] rounded-xl border border-gray-800 shadow-2xl p-8 animate-in fade-in zoom-in-95 duration-300">
+    <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-2xl p-8 animate-in fade-in zoom-in-95 duration-300">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mb-4">
             <Shield className="w-8 h-8 text-blue-500" />
           </div>
-          <h1 className="text-2xl font-bold text-white">SOC Dashboard</h1>
-          <p className="text-gray-400 mt-2 text-sm text-center">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">SOC Dashboard</h1>
+          <p className="text-[var(--text-secondary)] mt-2 text-sm text-center">
             {mfaRequired ? 'Enter the 6-digit code from your Authenticator app' : 'Sign in to access the Security Operations Center'}
           </p>
         </div>
@@ -108,7 +110,7 @@ export default function LoginPage() {
           {!mfaRequired ? (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Username</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                   <input
@@ -116,14 +118,14 @@ export default function LoginPage() {
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg pl-10 pr-4 py-3 text-[var(--text-primary)] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
                     placeholder="admin"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                   <input
@@ -131,7 +133,7 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-[#0a0e1a] border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg pl-10 pr-4 py-3 text-[var(--text-primary)] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors"
                     placeholder="????????"
                   />
                 </div>
@@ -139,7 +141,7 @@ export default function LoginPage() {
             </>
           ) : (
             <div className="animate-in slide-in-from-right-8 duration-300">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Authenticator Code</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Authenticator Code</label>
               <div className="relative">
                 <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500" />
                 <input
@@ -149,7 +151,7 @@ export default function LoginPage() {
                   maxLength={6}
                   value={mfaCode}
                   onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-[#0a0e1a] border border-indigo-500/50 rounded-lg pl-10 pr-4 py-3 text-white font-mono text-center tracking-[0.5em] text-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-colors"
+                  className="w-full bg-[var(--bg-primary)] border border-indigo-500/50 rounded-lg pl-10 pr-4 py-3 text-[var(--text-primary)] font-mono text-center tracking-[0.5em] text-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-colors"
                   placeholder="000000"
                 />
               </div>
@@ -159,7 +161,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-[var(--text-primary)] font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -170,7 +172,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => { setMfaRequired(false); setMfaCode(''); setError(''); }}
-              className="w-full text-gray-400 hover:text-white text-sm transition-colors mt-4"
+              className="w-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition-colors mt-4"
             >
               Back to Password
             </button>
