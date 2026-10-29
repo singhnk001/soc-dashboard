@@ -145,8 +145,9 @@ def process_log_entry(entry: LogEntry, conn, active_parsers: list, active_usecas
                     FROM threat_indicators ti
                     JOIN threat_feeds tf ON ti.feed_id = tf.id
                     WHERE ti.indicator IN ({placeholders})
+                       OR SPLIT_PART(ti.indicator, ':', 1) IN ({placeholders})
                     LIMIT 10""",
-                iocs
+                iocs + iocs
             ).fetchall()
 
             if ti_rows:
@@ -163,7 +164,7 @@ def process_log_entry(entry: LogEntry, conn, active_parsers: list, active_usecas
                 recent = cursor.execute(
                     """SELECT COUNT(*) FROM alerts
                        WHERE title LIKE %s
-                       AND timestamp > NOW() - INTERVAL '5 minutes'""",
+                       AND timestamp::timestamptz > NOW() - INTERVAL '5 minutes'""",
                     (f"%TI Match%{entry.hostname or entry.source}%",)
                 ).fetchone()[0]
                 if recent == 0:
@@ -206,7 +207,7 @@ def process_log_entry(entry: LogEntry, conn, active_parsers: list, active_usecas
                 
                 if uc.get("threshold_count") and count >= uc["threshold_count"]:
                     recent_alert = cursor.execute(
-                        "SELECT COUNT(*) FROM alerts WHERE title LIKE %s AND timestamp > NOW() - INTERVAL '5 minutes'",
+                        "SELECT COUNT(*) FROM alerts WHERE title LIKE %s AND timestamp::timestamptz > NOW() - INTERVAL '5 minutes'",
                         (f"%{uc['title']}%",)
                     ).fetchone()[0]
                     

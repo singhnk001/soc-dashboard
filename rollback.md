@@ -6,15 +6,17 @@ This document provides exact step-by-step instructions to roll back changes made
 
 ## 1. Quick Git Rollback Checkpoints
 
-### Current Checkpoint (ADR-020: Bi-Directional Source & Destination TI Correlation)
+### Current Checkpoint (ADR-021: Automated Threat Intelligence Alert Generation & Timestamp Cast Hardening)
 - **Commit:** Latest on `main`
 - **Features:** 
-  - Bi-directional Threat Intelligence correlation across **both Source IP and Destination IP** in `src/app/logs/page.tsx` and `api/services/ingestion.py`.
-  - Added explicit `Signature ID` (`FG-IPS-39812`, `FG-IPS-41025`, `FG-IPS-41051`) and `Detected Threat Intel Feed` (`ThreatFox (abuse.ch)`, `AlienVault OTX Community Feed`, `AbuseIPDB Threat Intelligence`, `CISA KEV`) to the Threat Intelligence & Intrusion Correlation banner.
-  - Added `Signature ID` and `Detected Threat Intel Feed` to attributes list and live search in `src/app/logs/page.tsx` (searching `sign` displays both signature name and signature ID).
-  - Enriched `scripts/fortinet_firewall_simulator.py` with `sig_id`, `attack_id`, `threat_feed`, and `threat_confidence` in syslog strings and JSON payloads.
+  - Automated `[TI Match]` alert creation whenever an ingested log matches any indicator in the 69,000+ `threat_indicators` table (ThreatFox, AlienVault OTX, AbuseIPDB, CISA KEV).
+  - Explicit `alerts.timestamp::timestamptz` type casting preventing PostgreSQL transaction aborts.
+  - Substring matching for `ip:port` indicators via `SPLIT_PART(ti.indicator, ':', 1)`.
+  - Bi-directional Threat Intelligence correlation across both Source IP and Destination IP.
+  - Explicit `Signature ID` and `Detected Threat Intel Feed` attribution.
 
 ### Previous Checkpoints:
+- **`21cc580`:** Bi-directional (Source & Destination IP) TI correlation (ADR-020).
 - **`84775ac`:** Explicit Signature ID & Detected Threat Intel Feed Attribution (ADR-019).
 - **`72b9a1e`:** Event Inspector UX & Ergonomics redesign (dark slate theme, connection flow hero, 3 tabs).
 - **`1840e76`:** Simulator scope fix and default variable initialization.
@@ -38,11 +40,10 @@ git reset --hard <checkpoint-hash>
 git push origin main --force
 ```
 
-### Procedure B: Reverting Specific Files
-To restore the previous `logs/page.tsx`:
+### Procedure B: Reverting Ingestion Service Only
+To restore the previous `api/services/ingestion.py`:
 ```powershell
-git checkout 84775ac -- src/app/logs/page.tsx
-npm.cmd run build
+git checkout 21cc580 -- api/services/ingestion.py
 ```
 
 ### Procedure C: Stopping or Restarting the Fortinet Simulator

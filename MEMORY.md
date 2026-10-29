@@ -13,6 +13,7 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 | FastAPI API | ✅ Running | `0.0.0.0:8002`, `--workers 1` |
 | Next.js Frontend | ✅ Running (Port 3000) | Standard responsive layout, `h-screen w-full`, 40 routes compiled |
 | Event Inspector Slide-Over | 🌟 Modernized | High-comfort dark slate theme, Network Flow visualizer, 3-tab layout, zero glare |
+| Threat Intel Alerts | 🚨 Automated | Real-time `[TI Match]` alerts generated on any malicious IP hit (ThreatFox, AlienVault, AbuseIPDB, CISA KEV) |
 | Threat Intel & Signatures | 🛡️ Bi-Directional | Explicit `Signature ID` (`FG-IPS-39812`), `Detected Threat Intel Feed`, and `Confidence %` evaluating **BOTH Source and Destination IPs** |
 | Authentication & MFA | ✅ Active | `/api/auth/login` (admin + demo + port 8002 proxy) & `/api/auth/login/mfa` |
 | Fortinet FortiGate Simulator | 🟢 Streaming | Continuous real-time background daemon (1-2 logs/sec) with enriched signature IDs and feeds |
@@ -25,12 +26,20 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 
 ## Known Issues, Quirks & Workarounds
 
+### Automated Threat Intelligence Alerts (ADR-021)
+- **Automatic Alert Creation:** Whenever a firewall or endpoint log is ingested, `api/services/ingestion.py` extracts all public IPs, hashes, URLs, and domains and queries the 69,000+ indicators in `threat_indicators`.
+- **Alert Creation Details:** When a match is detected:
+  - Generates an alert: `[TI Match] 1 IOC matched on <Device/Host>` with `severity: critical` or `high`.
+  - Attaches feed attribution: e.g., `194.26.29.112 (IPv4) — ThreatFox — Recent IOCs`.
+  - Tags MITRE ATT&CK technique: `T1071` (Command and Control).
+- **Rate-Limiting & Deduplication:** Throttled to 1 alert per 5 minutes per host to prevent alert flooding during high-volume attacks using `timestamp::timestamptz > NOW() - INTERVAL '5 minutes'`.
+
 ### Threat Intelligence: Bi-Directional Source & Destination Correlation (ADR-019 & ADR-020)
 - **Source & Destination Coverage:** Threat Intelligence auto-detection inspects **both** `source_ip` and `destination_ip`.
   - **Inbound Attacks:** When external adversaries (e.g., scanners, brute-force sources, botnets) hit the perimeter, their IP is in `source_ip` (`srcip`). The engine queries AlienVault, ThreatFox, AbuseIPDB, and CISA KEV to identify the attacker.
   - **Outbound Connections:** When an internal compromised client initiates an outbound beacon to a C2 or malware host, the malicious IP is in `destination_ip` (`dstip`). The engine correlates the C2 server and attributes the feed.
 - **Signature ID Visibility:** Displayed in both the Threat Intelligence hero card and the Attributes search table. Searching `sign` matches both `Threat / Attack Signature` and `Signature ID`.
-- **Feed Attribution:** Every flagged event clearly attributes the detecting feed (e.g. `ThreatFox (abuse.ch)`, `AlienVault OTX Community Feed`, `AbuseIPDB Threat Intelligence`, `CISA KEV`) along with a confidence rating.
+- **Feed Attribution:** Every flagged event clearly attributes the detecting feed along with a confidence rating.
 
 ### Event Inspector & UX Ergonomics
 - **No Table Squishing:** Event slide-over uses standard fixed overlay (`w-[640px] max-w-[95vw]` with `bg-black/60 backdrop-blur-[2px]`). Main table width does not contract or shift horizontally.
@@ -63,8 +72,7 @@ npm run dev
 # 3. Stream Fortinet Simulator Logs
 python scripts/fortinet_firewall_simulator.py --continuous
 
-# 4. View Fortinet Logs in Real-Time
-# Navigate to: http://localhost:3000/logs -> Click any log row or "Full Event Details"
-# Search "sign" to see both "Threat / Attack Signature" and "Signature ID"
-# Check the Threat Intelligence banner for "Detected by: ThreatFox (abuse.ch)" and confidence badge.
+# 4. View Alerts & Threat Intelligence
+# Navigate to: http://localhost:3000/alerts -> View automatically generated [TI Match] alerts
+# Navigate to: http://localhost:3000/logs -> Inspect individual events with Signature ID and Feed Attribution
 ```

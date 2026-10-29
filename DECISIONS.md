@@ -147,3 +147,15 @@
 - Evaluating only destination IPs creates a blind spot for inbound perimeter probes, brute-force attacks, and external exploit attempts.
 **Impact:**
 - Complete 360-degree Threat Intelligence coverage across both inbound attack vectors and outbound compromises.
+
+
+## ADR-021: Automated Threat Intelligence Alert Generation & Timestamp Cast Hardening
+**Decision:**
+1. Cast `alerts.timestamp::timestamptz` in deduplication and rate-limiting queries within `api/services/ingestion.py`.
+2. Expanded Threat Intelligence matching in `api/services/ingestion.py` with `SPLIT_PART(ti.indicator, ':', 1)` to match both standard IP indicators and `ip:port` indicators.
+3. Seeded and verified C2 & malicious IPs within the PostgreSQL `threat_indicators` database table.
+**Reason:**
+- When comparing the `alerts.timestamp` column (stored as `text`) against `NOW() - INTERVAL '5 minutes'` in PostgreSQL, an unhandled type mismatch error (`operator does not exist: text > timestamp with time zone`) aborted the transaction, silently blocking alert insertion.
+- Explicitly casting `timestamp::timestamptz` resolves the type mismatch and guarantees alert creation.
+**Impact:**
+- Any log containing an IP, domain, URL, or hash that matches any active Threat Intel feed (ThreatFox, AlienVault OTX, AbuseIPDB, CISA KEV) immediately triggers an automated `[TI Match]` alert with full attribution and MITRE Tactic tagging.
