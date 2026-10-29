@@ -6,11 +6,13 @@ This document provides exact step-by-step instructions to roll back changes made
 
 ## 1. Quick Git Rollback Checkpoints
 
-### Current Checkpoint (Post Fortinet Simulator & Ingestion Enhancements)
+### Current Checkpoint (Post Event Inspector & UX Ergonomics Redesign)
 - **Commit:** Latest on `main`
-- **Features:** Auto-detecting Fortinet simulator (`scripts/fortinet_firewall_simulator.py`), `source_ip`/`destination_ip` extraction in `api/services/ingestion.py`, Next.js ingestion proxy (`/api/logs/ingest`), `/api/auth/login/mfa` route, FastAPI port 8002 proxying, safe date parsing (`date-utils.ts`), and global `ErrorBoundary`.
+- **Features:** Redesigned Event Inspector slide-over (network flow visualizer, 3-tab layout, eye-comfort slate theme, no table squish), inline QuickSummary upgrade, `log_type: Firewall` normalization, auto-detecting Fortinet simulator (`scripts/fortinet_firewall_simulator.py`), `source_ip`/`destination_ip` extraction in `api/services/ingestion.py`, Next.js ingestion proxy (`/api/logs/ingest`), `/api/auth/login/mfa` route, FastAPI port 8002 proxying, safe date parsing (`date-utils.ts`), and global `ErrorBoundary`.
 
 ### Previous Checkpoints:
+- **`1840e76`:** Simulator scope fix and default variable initialization.
+- **`4d875d7`:** Live simulator ingestion, IP extraction, and docs.
 - **`a9371dc`:** MFA route, admin fallback, dev server cache cleanup.
 - **`e10ad61`:** Updated docs and Fortinet initial integration.
 - **`05b95a9`:** Fortinet FortiGate simulator and documentation.
@@ -30,22 +32,17 @@ git reset --hard <checkpoint-hash>
 git push origin main --force
 ```
 
-### Procedure B: Stopping the Fortinet Simulator
+### Procedure B: Reverting Event Inspector UI Only
+To restore the previous `logs/page.tsx`:
+```powershell
+git checkout 1840e76 -- src/app/logs/page.tsx
+npm.cmd run build
+```
+
+### Procedure C: Stopping the Fortinet Simulator
 To stop the background Fortinet simulator at any time:
 ```powershell
-Get-Process python | Where-Object { $_.CommandLine -like "*fortinet_firewall_simulator*" } | Stop-Process -Force
-```
-
-### Procedure C: Reverting Specific Features Without Full Rollback
-
-#### 1. Revert Ingestion Extraction:
-```powershell
-git checkout a9371dc -- api/services/ingestion.py
-```
-
-#### 2. Revert Next.js Ingest Proxy:
-```powershell
-Remove-Item -Path "src\app\api\logs\ingest" -Recurse -Force
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*fortinet_firewall_simulator*" } | Stop-Process -Force
 ```
 
 ---

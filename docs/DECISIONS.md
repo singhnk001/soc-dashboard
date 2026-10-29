@@ -90,3 +90,21 @@
 - Log entries previously lacked populated `source_ip` and `destination_ip` columns in PostgreSQL because `process_log_entry` only parsed JSON sub-objects.
 **Impact:**
 - Full-fidelity Fortinet telemetry streams live into the SOC Log Explorer, Dashboard charts, and alert correlation pipelines with complete IP and MITRE visibility.
+
+## ADR-018: Modern SOC Event Inspector Redesign & Eye-Comfort Ergonomics
+**Decision:**
+1. Redesigned the Event Details slide-over panel into an enterprise-grade SOC inspector (`w-[640px] max-w-[95vw]` with dark glass backdrop `bg-black/60 backdrop-blur-[2px]`).
+2. Eliminated screen-squishing margin (`mr-[560px]`), preventing horizontal table shift and motion fatigue.
+3. Replaced neon-green high-glare console boxes with comfortable, enterprise-grade dark slate theme (`bg-[#0c1220]`, `bg-[#090d16]`, soft muted text `text-slate-200`/`text-slate-400`).
+4. Added a visual **Network & Telemetry Flow Hero** (Source Node ➔ Action Badge ➔ Destination Node with protocol, service, duration, bytes, and 1-click IP copy/filter).
+5. Implemented interactive 3-tab navigation:
+   - `📋 Overview & Fields`: Grouped identity, network, and security attributes with live search and field count.
+   - `🏷️ Key-Value Tags (N)`: Interactive SOC chips for every parsed parameter (`action`, `service`, `app`, `devname`, `logid`, `sentbyte`, etc.) with 1-click filter and copy.
+   - `📜 Raw Message`: View toggle for Clean Un-Escaped Log Line vs Structured JSON Tree with 1-click copy.
+6. Upgraded inline `QuickSummary` with mini flow card and soft unescaped preview.
+7. Corrected `log_type` in `api/services/ingestion.py` and `api/routers/logs.py` to properly classify Fortinet firewall logs as `Firewall`.
+**Reason:**
+- The previous slide-over used harsh neon green on pitch black, squished the main table by 560px causing disorientation, and displayed raw escaped JSON with backslashes (`{\"original_line\": ...}`), causing severe visual strain and poor focus.
+- Fortinet logs were incorrectly labeled as `Windows Event`.
+**Impact:**
+- High-comfort, ergonomic, enterprise-tier log analysis matching CrowdStrike, Splunk ES, and Microsoft Sentinel standards. Zero eye strain, clear visual hierarchy, and fast incident investigation workflows.

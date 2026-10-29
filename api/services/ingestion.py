@@ -86,13 +86,14 @@ def process_log_entry(entry: LogEntry, conn, active_parsers: list, active_usecas
         except Exception:
             pass 
 
+    computed_log_type = entry.log_type or ("Firewall" if "fortinet" in (entry.source or "").lower() else "Security Telemetry")
     cursor.execute("""
-        INSERT INTO logs (id, timestamp, source, event_id, severity, message, hostname, username, raw_log, mitre_tactics, mitre_techniques, source_ip, destination_ip)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO logs (id, timestamp, source, event_id, severity, message, hostname, username, raw_log, mitre_tactics, mitre_techniques, source_ip, destination_ip, log_type)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         log_id, entry.timestamp, entry.source, entry.event_id, entry.severity, 
         entry.message, entry.hostname, entry.username, raw_log, 
-        mitre_tactics_json, mitre_techniques_json, src_ip, dest_ip
+        mitre_tactics_json, mitre_techniques_json, src_ip, dest_ip, computed_log_type
     ))
 
     # Auto-register / update endpoint_agents in separate connection

@@ -7,7 +7,8 @@ import {
   X, ChevronDown, AlertTriangle, Info, AlertCircle,
   ShieldAlert, Activity, Terminal, Shield, Copy, Plus,
   ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal, Check,
-  ExternalLink, Play, Radio, Columns
+  ExternalLink, Play, Radio, Columns, ArrowRight, Network,
+  Globe, Server, Tag, FileText, Zap, ShieldCheck
 } from 'lucide-react';
 
 /* ─── severity ──────────────────────────────────────────────── */
@@ -78,9 +79,20 @@ interface ApiResponse { data: Log[]; total: number; page: number; pages: number;
 type SortField = 'timestamp' | 'severity' | 'hostname' | 'source' | 'eventId';
 type SortDir   = 'asc' | 'desc';
 
+/* ─── action badges ─────────────────────────────────────────── */
+const ACTION_BADGE: Record<string, string> = {
+  accept:    'text-emerald-300 bg-emerald-500/15 border-emerald-500/30',
+  permitted: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30',
+  allow:     'text-emerald-300 bg-emerald-500/15 border-emerald-500/30',
+  deny:      'text-rose-300    bg-rose-500/15    border-rose-500/30',
+  blocked:   'text-rose-300    bg-rose-500/15    border-rose-500/30',
+  drop:      'text-purple-300  bg-purple-500/15  border-purple-500/30',
+  dropped:   'text-purple-300  bg-purple-500/15  border-purple-500/30',
+  close:     'text-slate-300   bg-slate-700/30   border-slate-600/40',
+};
+
 /* ─── helpers ───────────────────────────────────────────────── */
 function getEventName(log: Log): string {
-  // Try to extract a meaningful event name from the message or rawLog
   if (log.message && log.message !== `EventID ${log.eventId}` && log.message.trim() !== '') {
     return log.message;
   }
@@ -90,32 +102,117 @@ function getEventName(log: Log): string {
   return `EventID ${log.eventId ?? '—'}`;
 }
 
-/* Flatten rawLog into [key, value] pairs for display */
-function flattenRawLog(rawLog: any): [string, string][] {
-  if (!rawLog || typeof rawLog !== 'object') return [];
-  const out: [string, string][] = [];
-  
-  // Top-level scalars first
-  for (const [k, v] of Object.entries(rawLog)) {
-    if (k === 'extracted_fields') continue;
-    if (typeof v === 'object' && v !== null) continue;
-    out.push([k, String(v ?? '')]);
+function getEffectiveLogType(log: Log): string {
+  if (log.logType && log.logType !== 'Windows Event' && log.logType !== 'Security Event') {
+    return log.logType;
   }
-  // extracted_fields
-  const ef = rawLog.extracted_fields;
-  if (ef && typeof ef === 'object') {
-    for (const [k, v] of Object.entries(ef)) {
-      if (typeof v !== 'object') out.push([k, String(v ?? '')]);
+  const src = (log.source || '').toLowerCase();
+  const raw = (typeof log.rawLog === 'string' ? log.rawLog : JSON.stringify(log.rawLog || '')).toLowerCase();
+  if (src.includes('fortinet') || raw.includes('fortigate') || raw.includes('devname="fg-') || raw.includes('type="traffic"')) {
+    return 'Fortinet Firewall';
+  }
+  if (src.includes('palo') || src.includes('cisco') || src.includes('firewall')) {
+    return 'Firewall';
+  }
+  if (src.includes('suricata') || src.includes('snort') || src.includes('zeek')) {
+    return 'NIDS / Network';
+  }
+  if (src.includes('syslog') || src.includes('linux')) {
+    return 'Linux Syslog';
+  }
+  return log.logType || 'Security Telemetry';
+}
+
+interface ParsedLogDetails {
+  cleanLine: string;
+  kvPairs: [string, string][];
+  action?: string;
+  protocol?: string;
+  service?: string;
+  app?: string;
+  srcPort?: string;
+  dstPort?: string;
+  bytesSent?: string;
+  bytesRcvd?: string;
+  policyId?: string;
+  sessionId?: string;
+  device?: string;
+  attack?: string;
+  user?: string;
+  jsonObj: any;
+}
+
+function parseRawLogData(rawLog: any, message: string | null): ParsedLogDetails {
+  let cleanLine = '';
+  const kvMap: Record<string, string> = {};
+  let jsonObj: any = null;
+
+  if (typeof rawLog === 'string') {
+    cleanLine = rawLog;
+    if (rawLog.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(rawLog);
+        jsonObj = parsed;
+        if (parsed.original_line) {
+          cleanLine = parsed.original_line;
+        }
+        if (parsed.extracted_fields && typeof parsed.extracted_fields === 'object') {
+          Object.assign(kvMap, parsed.extracted_fields);
+        }
+      } catch {}
+    }
+  } else if (rawLog && typeof rawLog === 'object') {
+    jsonObj = rawLog;
+    if (rawLog.original_line) {
+      cleanLine = rawLog.original_line;
+    } else {
+      cleanLine = JSON.stringify(rawLog, null, 2);
+    }
+    if (rawLog.extracted_fields && typeof rawLog.extracted_fields === 'object') {
+      Object.assign(kvMap, rawLog.extracted_fields);
+    }
+  } else if (message) {
+    cleanLine = message;
+  }
+
+  // Regex parse key=value or key="value" from cleanLine (Fortinet / Syslog / CEF format)
+  const kvRegex = /([a-zA-Z0-9_\-\.]+)=(?:"([^"]*)"|'([^']*)'|([^\s,]+))/g;
+  let match;
+  while ((match = kvRegex.exec(cleanLine)) !== null) {
+    const k = match[1];
+    const v = match[2] ?? match[3] ?? match[4] ?? '';
+    if (!kvMap[k]) {
+      kvMap[k] = v;
     }
   }
-  return out;
+
+  const kvPairs = Object.entries(kvMap).sort(([a], [b]) => a.localeCompare(b));
+
+  return {
+    cleanLine: cleanLine || (message ?? ''),
+    kvPairs,
+    action: kvMap.action || kvMap.status || kvMap.act,
+    protocol: kvMap.proto === '6' ? 'TCP (6)' : kvMap.proto === '17' ? 'UDP (17)' : kvMap.proto || kvMap.protocol,
+    service: kvMap.service || kvMap.app,
+    app: kvMap.app,
+    srcPort: kvMap.srcport || kvMap.src_port || kvMap.spt,
+    dstPort: kvMap.dstport || kvMap.dst_port || kvMap.dpt,
+    bytesSent: kvMap.sentbyte || kvMap.bytes_out,
+    bytesRcvd: kvMap.rcvdbyte || kvMap.bytes_in,
+    policyId: kvMap.policyid || kvMap.policy_id,
+    sessionId: kvMap.sessionid || kvMap.session_id,
+    device: kvMap.devname || kvMap.device_name,
+    attack: kvMap.attack || kvMap.signature || kvMap.threat,
+    user: kvMap.user || kvMap.username || kvMap.usr,
+    jsonObj: jsonObj || { message: cleanLine },
+  };
 }
 
 /* ─── AttrRow ────────────────────────────────────────────────── */
 function AttrRow({ label, value, onAddFilter }: { label: string; value: string; onAddFilter?: (v: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const isLong = value.length > 60;
+  const isLong = value.length > 55;
 
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -123,31 +220,41 @@ function AttrRow({ label, value, onAddFilter }: { label: string; value: string; 
   };
 
   return (
-    <tr className="border-b border-[var(--border-color)] last:border-0 group hover:bg-white/5">
-      <td className="py-2 pr-4 text-xs font-medium text-[var(--text-secondary)] align-top w-44 whitespace-nowrap">{label}</td>
-      <td className="py-2 text-xs text-[var(--text-primary)] font-mono align-top">
+    <tr className="border-b border-slate-800/60 last:border-0 group hover:bg-slate-800/40 transition-colors">
+      <td className="py-2.5 px-3.5 text-xs font-medium text-slate-400 align-top w-48 whitespace-nowrap">
+        {label}
+      </td>
+      <td className="py-2.5 px-3.5 text-xs text-slate-200 font-mono align-top">
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
             <span
-              className={isLong && !expanded ? 'block truncate max-w-xs cursor-pointer' : 'break-all whitespace-pre-wrap'}
+              className={isLong && !expanded ? 'block truncate max-w-sm cursor-pointer hover:text-blue-300' : 'break-all whitespace-pre-wrap'}
               onClick={() => isLong && setExpanded(v => !v)}
               title={isLong && !expanded ? value : undefined}
             >
               {value || '—'}
             </span>
             {isLong && (
-              <button onClick={() => setExpanded(v => !v)} className="text-[10px] text-blue-400 hover:text-blue-300 mt-0.5 block">
-                {expanded ? 'collapse ▲' : 'expand ▼'}
+              <button onClick={() => setExpanded(v => !v)} className="text-[10px] text-blue-400 hover:text-blue-300 mt-1 block font-sans">
+                {expanded ? '▲ Collapse' : '▼ Expand'}
               </button>
             )}
           </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-            <button onClick={copy} className="p-0.5 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Copy">
-              {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button
+              onClick={copy}
+              className="p-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition-colors"
+              title="Copy value"
+            >
+              {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
             </button>
-            {onAddFilter && value && (
-              <button onClick={() => onAddFilter(value)} className="p-0.5 rounded text-[var(--text-secondary)] hover:text-blue-400" title="Add to filter">
-                <Plus size={11} />
+            {onAddFilter && value && value !== '—' && (
+              <button
+                onClick={() => onAddFilter(value)}
+                className="p-1 rounded bg-slate-800/80 hover:bg-blue-600 text-slate-400 hover:text-white transition-colors"
+                title="Filter by this attribute"
+              >
+                <Plus size={12} />
               </button>
             )}
           </div>
@@ -157,127 +264,421 @@ function AttrRow({ label, value, onAddFilter }: { label: string; value: string; 
   );
 }
 
-/* ─── Event Detail Slide-Over ───────────────────────────────── */
+/* ─── Event Detail Slide-Over (Modern SOC Inspector) ────────── */
 function EventDetail({ log, onClose, onAddFilter }: {
   log: Log; onClose: () => void;
   onAddFilter: (field: string, value: string) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'tokens' | 'raw'>('overview');
   const [attrSearch, setAttrSearch] = useState('');
+  const [rawViewMode, setRawViewMode] = useState<'clean' | 'json'>('clean');
   const [rawCopied, setRawCopied] = useState(false);
+  const [srcIpCopied, setSrcIpCopied] = useState(false);
+  const [dstIpCopied, setDstIpCopied] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const sev = (log.severity || 'info').toLowerCase();
+  const effectiveLogType = getEffectiveLogType(log);
+  const parsed = parseRawLogData(log.rawLog, log.message);
 
-  const rawStr = log.rawLog
-    ? (typeof log.rawLog === 'string' ? log.rawLog : JSON.stringify(log.rawLog, null, 2))
-    : null;
+  const formattedTime = log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+    year: 'numeric', month: 'short', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }) : '—';
 
-  const allAttrs: [string, string][] = [
-    ['Timestamp',  log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-      year: 'numeric', month: 'short', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-    }) : '—'],
-    ['Hostname',   log.hostname ?? '—'],
-    ['Source',     log.source ?? '—'],
-    ['Log Type',   log.logType ?? '—'],
-    ['Severity',   sev],
-    ['Event ID',   String(log.eventId ?? '—')],
-    ['Event Name', getEventName(log)],
-    ['Message',    log.message ?? '—'],
-    ...(log.sourceIp      ? [['Source IP',  log.sourceIp] as [string,string]]      : []),
-    ...(log.destinationIp ? [['Dest IP',    log.destinationIp] as [string,string]] : []),
-    ...(log.username      ? [['Username',   log.username] as [string,string]]       : []),
-    ...(log.mitreTactic   ? [['MITRE Tactic', log.mitreTactic] as [string,string]]  : []),
-    ...(log.mitreTechnique? [['MITRE Technique', log.mitreTechnique] as [string,string]] : []),
-    ...flattenRawLog(log.rawLog).map(([k, v]) => [k, v] as [string, string]),
+  const actionText = parsed.action || (log.severity === 'critical' ? 'BLOCKED' : log.severity === 'high' ? 'DROPPED' : 'PERMITTED');
+  const actionLower = actionText.toLowerCase();
+  const actionClass = ACTION_BADGE[actionLower] || (
+    actionLower.includes('deny') || actionLower.includes('drop') || actionLower.includes('block')
+      ? 'text-rose-300 bg-rose-500/15 border-rose-500/30'
+      : 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+  );
+
+  const coreAttributes: [string, string][] = [
+    ['Timestamp',       formattedTime],
+    ['Severity',        sev.toUpperCase()],
+    ['Source',          log.source ?? '—'],
+    ['Log Type',        effectiveLogType],
+    ['Hostname / Host', log.hostname ?? parsed.device ?? '—'],
+    ['Event ID',        String(log.eventId ?? '—')],
+    ['Event Name',      getEventName(log)],
+    ['Message',         log.message ?? '—'],
+    ...(log.sourceIp || parsed.srcPort ? [['Source Network', `${log.sourceIp || '—'}${parsed.srcPort ? ':' + parsed.srcPort : ''}`] as [string, string]] : []),
+    ...(log.destinationIp || parsed.dstPort ? [['Destination Network', `${log.destinationIp || '—'}${parsed.dstPort ? ':' + parsed.dstPort : ''}`] as [string, string]] : []),
+    ...(parsed.protocol  ? [['Protocol', parsed.protocol] as [string, string]] : []),
+    ...(parsed.service   ? [['Service / App', `${parsed.service}${parsed.app && parsed.app !== parsed.service ? ' (' + parsed.app + ')' : ''}`] as [string, string]] : []),
+    ...(actionText       ? [['Action', actionText.toUpperCase()] as [string, string]] : []),
+    ...(parsed.bytesSent || parsed.bytesRcvd ? [['Traffic Volume', `Out: ${parsed.bytesSent || '0'} bytes | In: ${parsed.bytesRcvd || '0'} bytes`] as [string, string]] : []),
+    ...(parsed.policyId  ? [['Firewall Policy ID', parsed.policyId] as [string, string]] : []),
+    ...(parsed.sessionId ? [['Firewall Session ID', parsed.sessionId] as [string, string]] : []),
+    ...(log.username || parsed.user ? [['Username', (log.username || parsed.user)!] as [string, string]] : []),
+    ...(log.mitreTactic  ? [['MITRE Tactic', log.mitreTactic] as [string, string]] : []),
+    ...(log.mitreTechnique ? [['MITRE Technique', log.mitreTechnique] as [string, string]] : []),
+    ...(parsed.attack    ? [['Threat / Attack Signature', parsed.attack] as [string, string]] : []),
+    ...parsed.kvPairs.map(([k, v]) => [k, String(v ?? '')] as [string, string]),
   ];
 
-  const filteredAttrs = attrSearch
-    ? allAttrs.filter(([k, v]) =>
+  const filteredAttrs = attrSearch.trim()
+    ? coreAttributes.filter(([k, v]) =>
         k.toLowerCase().includes(attrSearch.toLowerCase()) ||
         v.toLowerCase().includes(attrSearch.toLowerCase())
       )
-    : allAttrs;
+    : coreAttributes;
 
-  const copyRaw = () => {
-    if (rawStr) navigator.clipboard.writeText(rawStr).then(() => { setRawCopied(true); setTimeout(() => setRawCopied(false), 1500); });
+  const copyText = (txt: string, cb: (v: boolean) => void) => {
+    navigator.clipboard.writeText(txt).then(() => {
+      cb(true);
+      setTimeout(() => cb(false), 1500);
+    });
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[560px] max-w-full bg-[#0d0f14] border-l border-[var(--border-color)] shadow-2xl z-50 flex flex-col">
-      {/* header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] shrink-0">
-        <div className="flex items-center gap-2.5">
-          <Terminal size={14} className="text-blue-400" />
-          <span className="text-sm font-semibold text-[var(--text-primary)]">Event Details</span>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border ${SEV_BADGE[sev] || SEV_BADGE.info}`}>
-            {sev.charAt(0).toUpperCase() + sev.slice(1)}
-          </span>
+    <div className="fixed inset-y-0 right-0 w-[640px] max-w-[95vw] bg-[#0c1220] border-l border-slate-800 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-200">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-[#0e1626]/80 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/25 flex items-center justify-center">
+            <Shield className="w-4 h-4 text-blue-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-slate-100">Event Inspector</span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${SEV_BADGE[sev] || SEV_BADGE.info}`}>
+                {sev.toUpperCase()}
+              </span>
+              <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                {effectiveLogType}
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+              <span>{log.source || 'Generic'}</span>
+              <span>•</span>
+              <span className="font-mono">{formattedTime}</span>
+            </div>
+          </div>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => copyText(parsed.cleanLine, setRawCopied)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700 rounded-md border border-slate-700 transition-colors"
+            title="Copy Raw Log Message"
+          >
+            {rawCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            <span>{rawCopied ? 'Copied' : 'Copy'}</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
+            title="Close (Esc)"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
-      {/* body */}
-      <div className="flex-1 overflow-y-auto">
-        {/* raw message block */}
-        <div className="px-5 pt-4 pb-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-secondary)]">Raw Message</span>
-            <button onClick={copyRaw} className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-              {rawCopied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
-              {rawCopied ? 'Copied' : ''}
-            </button>
-          </div>
-          <pre className="text-[11px] font-mono bg-[#080a0f] border border-[var(--border-color)] rounded p-3 max-h-48 overflow-y-auto text-green-400 whitespace-pre-wrap break-all leading-relaxed">
-            {rawStr || '—'}
-          </pre>
-        </div>
-
-        {/* attributes table */}
-        <div className="px-5 pb-5">
-          {/* search */}
-          <div className="relative mb-3">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-            <input
-              type="text"
-              value={attrSearch}
-              onChange={e => setAttrSearch(e.target.value)}
-              placeholder="Search attributes..."
-              className="w-full pl-8 pr-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-xs outline-none focus:border-blue-500 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
-            />
-          </div>
-
-          <div className="text-[11px] text-[var(--text-secondary)] mb-2">{filteredAttrs.length} attributes</div>
-
-          <div className="border border-[var(--border-color)] rounded overflow-hidden">
-            {/* column headers */}
-            <div className="flex bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
-              <div className="px-3 py-2 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider w-44">Attribute</div>
-              <div className="px-3 py-2 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider flex-1">Value</div>
+      {/* ── Scrollable Body ── */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {/* ── Traffic & Flow Hero Visualizer ── */}
+        {(log.sourceIp || log.destinationIp) && (
+          <div className="bg-[#11192a] border border-slate-800 rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              <div className="flex items-center gap-1.5">
+                <Network size={13} className="text-blue-400" />
+                <span>Connection & Telemetry Flow</span>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${actionClass}`}>
+                {actionText.toUpperCase()}
+              </span>
             </div>
-            <table className="w-full">
-              <tbody className="divide-y divide-[var(--border-color)]">
-                {filteredAttrs.length === 0 ? (
-                  <tr><td colSpan={2} className="px-3 py-4 text-xs text-center text-[var(--text-secondary)]">No matching attributes</td></tr>
-                ) : filteredAttrs.map(([k, v], i) => (
-                  <AttrRow
-                    key={`${k}-${i}`}
-                    label={k}
-                    value={v}
-                    onAddFilter={v && v !== '—' ? () => {
-                      const fieldMap: Record<string, string> = {
-                        'Source IP': 'source_ip', 'Dest IP': 'dest_ip', 'Hostname': 'hostname',
-                        'Username': 'username', 'Event ID': 'event_id', 'Source': 'source',
-                        'Severity': 'severity',
-                      };
-                      onAddFilter(fieldMap[k] || k.toLowerCase().replace(/\s+/g, '_'), v);
-                    } : undefined}
-                  />
-                ))}
-              </tbody>
-            </table>
+
+            <div className="grid grid-cols-11 items-center gap-2 text-center bg-[#090d16] p-3.5 rounded-lg border border-slate-800/80">
+              {/* Source Node */}
+              <div className="col-span-4 text-left">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Source (Client / Inbound)</div>
+                <div className="font-mono text-sm font-bold text-slate-100 mt-0.5 truncate" title={log.sourceIp || undefined}>
+                  {log.sourceIp || '—'}
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  {parsed.srcPort ? `Port ${parsed.srcPort}` : 'Ephemeral'}
+                </div>
+                {log.sourceIp && (
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <button
+                      onClick={() => copyText(log.sourceIp!, setSrcIpCopied)}
+                      className="text-[10px] text-slate-400 hover:text-slate-200 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/80 flex items-center gap-1"
+                    >
+                      {srcIpCopied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                      <span>Copy</span>
+                    </button>
+                    <button
+                      onClick={() => onAddFilter('source_ip', log.sourceIp!)}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 flex items-center gap-1"
+                    >
+                      <Plus size={10} />
+                      <span>Filter</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Center Flow Arrow */}
+              <div className="col-span-3 flex flex-col items-center justify-center">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  {parsed.protocol || 'IP'}
+                </span>
+                <div className="w-full flex items-center justify-center my-1">
+                  <div className="h-0.5 flex-1 bg-slate-700"></div>
+                  <ArrowRight size={14} className="text-blue-400 shrink-0 mx-1" />
+                  <div className="h-0.5 flex-1 bg-slate-700"></div>
+                </div>
+                <span className="text-[10px] font-mono text-blue-300 truncate max-w-[120px]">
+                  {parsed.service || 'Network'}
+                </span>
+              </div>
+
+              {/* Destination Node */}
+              <div className="col-span-4 text-right">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Destination (Service / Target)</div>
+                <div className="font-mono text-sm font-bold text-slate-100 mt-0.5 truncate" title={log.destinationIp || undefined}>
+                  {log.destinationIp || '—'}
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  {parsed.dstPort ? `Port ${parsed.dstPort}` : 'Target Port'}
+                </div>
+                {log.destinationIp && (
+                  <div className="flex items-center justify-end gap-1.5 mt-2">
+                    <button
+                      onClick={() => copyText(log.destinationIp!, setDstIpCopied)}
+                      className="text-[10px] text-slate-400 hover:text-slate-200 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/80 flex items-center gap-1"
+                    >
+                      {dstIpCopied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                      <span>Copy</span>
+                    </button>
+                    <button
+                      onClick={() => onAddFilter('dest_ip', log.destinationIp!)}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 flex items-center gap-1"
+                    >
+                      <Plus size={10} />
+                      <span>Filter</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* ── Threat Intelligence & Detection Banner ── */}
+        {(parsed.attack || log.mitreTactic || log.mitreTechnique) && (
+          <div className="bg-rose-500/10 border border-rose-500/25 rounded-xl p-3.5 flex items-start gap-3">
+            <ShieldAlert size={18} className="text-rose-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-rose-300">Threat Intelligence & MITRE Correlation</div>
+              {parsed.attack && (
+                <div className="text-xs text-rose-200 font-medium mt-0.5">
+                  Attack Signature: <span className="font-mono font-semibold">{parsed.attack}</span>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                {log.mitreTactic && (
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    Tactic: {log.mitreTactic}
+                  </span>
+                )}
+                {log.mitreTechnique && (
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                    Technique: {log.mitreTechnique}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Navigation Tabs ── */}
+        <div className="flex items-center gap-1 p-1 bg-[#101726] rounded-lg border border-slate-800">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === 'overview' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <ShieldCheck size={13} />
+            <span>Overview & Fields</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('tokens')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === 'tokens' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <Tag size={13} />
+            <span>Key-Value Tags ({parsed.kvPairs.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('raw')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === 'raw' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <FileText size={13} />
+            <span>Raw Message</span>
+          </button>
         </div>
+
+        {/* ── TAB 1: OVERVIEW & FIELDS ── */}
+        {activeTab === 'overview' && (
+          <div className="space-y-3">
+            {/* Search Filter */}
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={attrSearch}
+                onChange={e => setAttrSearch(e.target.value)}
+                placeholder="Search fields or values (e.g. 192.168, Fortinet, accept)..."
+                className="w-full pl-9 pr-3 py-2 bg-[#101726] border border-slate-800 rounded-lg text-xs outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500 transition-colors"
+              />
+            </div>
+
+            <div className="text-[11px] text-slate-400 font-medium px-1 flex items-center justify-between">
+              <span>Showing {filteredAttrs.length} attributes</span>
+              {attrSearch && (
+                <button onClick={() => setAttrSearch('')} className="text-blue-400 hover:underline">
+                  Clear search
+                </button>
+              )}
+            </div>
+
+            {/* Attributes Table */}
+            <div className="border border-slate-800 rounded-xl overflow-hidden bg-[#0d1424]">
+              <table className="w-full text-left">
+                <thead className="bg-[#11192d] border-b border-slate-800">
+                  <tr>
+                    <th className="py-2.5 px-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-48">Attribute</th>
+                    <th className="py-2.5 px-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Value</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredAttrs.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="px-4 py-8 text-center text-xs text-slate-400">
+                        No attributes matched "{attrSearch}"
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAttrs.map(([k, v], i) => (
+                      <AttrRow
+                        key={`${k}-${i}`}
+                        label={k}
+                        value={v}
+                        onAddFilter={v && v !== '—' ? () => {
+                          const fieldMap: Record<string, string> = {
+                            'Source Network': 'source_ip',
+                            'Destination Network': 'dest_ip',
+                            'Source IP': 'source_ip',
+                            'Dest IP': 'dest_ip',
+                            'Hostname': 'hostname',
+                            'Hostname / Host': 'hostname',
+                            'Username': 'username',
+                            'Event ID': 'event_id',
+                            'Source': 'source',
+                            'Severity': 'severity',
+                          };
+                          const cleanVal = v.split(':')[0].trim();
+                          onAddFilter(fieldMap[k] || k.toLowerCase().replace(/\s+/g, '_'), cleanVal);
+                        } : undefined}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 2: KEY-VALUE TAGS ── */}
+        {activeTab === 'tokens' && (
+          <div className="space-y-3">
+            <div className="text-xs text-slate-400">
+              Extracted tokens from the raw log message. Click any tag to copy or add directly to the active query filter.
+            </div>
+            {parsed.kvPairs.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 border border-slate-800 rounded-xl bg-[#0d1424]">
+                No structured key-value tokens detected in this event.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {parsed.kvPairs.map(([k, v]) => (
+                  <div
+                    key={k}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-[#0e1628] border border-slate-800/80 hover:border-slate-700 transition-all group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="text-[10px] font-mono font-semibold text-blue-400 truncate">{k}</div>
+                      <div className="text-xs font-mono text-slate-200 truncate mt-0.5" title={v}>{v || '—'}</div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button
+                        onClick={() => copyText(v, () => {})}
+                        className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                        title="Copy value"
+                      >
+                        <Copy size={11} />
+                      </button>
+                      <button
+                        onClick={() => onAddFilter(k, v)}
+                        className="p-1 rounded bg-blue-600/80 hover:bg-blue-600 text-white"
+                        title="Add to filter"
+                      >
+                        <Plus size={11} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB 3: RAW MESSAGE ── */}
+        {activeTab === 'raw' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-[#101726] p-0.5 rounded border border-slate-800 text-[11px]">
+                <button
+                  onClick={() => setRawViewMode('clean')}
+                  className={`px-2.5 py-1 rounded font-medium transition-colors ${rawViewMode === 'clean' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Clean Un-Escaped Log
+                </button>
+                <button
+                  onClick={() => setRawViewMode('json')}
+                  className={`px-2.5 py-1 rounded font-medium transition-colors ${rawViewMode === 'json' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  JSON Tree
+                </button>
+              </div>
+              <button
+                onClick={() => copyText(rawViewMode === 'clean' ? parsed.cleanLine : JSON.stringify(parsed.jsonObj, null, 2), setRawCopied)}
+                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {rawCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                <span>{rawCopied ? 'Copied' : 'Copy All'}</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <pre className="text-xs font-mono bg-[#070b14] border border-slate-800/80 rounded-xl p-4 max-h-[460px] overflow-y-auto text-slate-200 whitespace-pre-wrap break-all leading-relaxed shadow-inner">
+                {rawViewMode === 'clean'
+                  ? parsed.cleanLine
+                  : JSON.stringify(parsed.jsonObj, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -297,43 +698,74 @@ function QuickSummary({ log, onOpenDetail, onAddFilter }: {
   onOpenDetail: () => void;
   onAddFilter: (field: string, value: string) => void;
 }) {
+  const parsed = parseRawLogData(log.rawLog, log.message);
+  const effectiveLogType = getEffectiveLogType(log);
+  const actionText = parsed.action || (log.severity === 'critical' ? 'BLOCKED' : log.severity === 'high' ? 'DROPPED' : 'PERMITTED');
+  const actionLower = actionText.toLowerCase();
+  const actionClass = ACTION_BADGE[actionLower] || 'text-slate-300 bg-slate-800/60 border-slate-700';
+
   return (
-    <tr className="bg-[var(--bg-secondary)]/60 border-b border-[var(--border-color)]">
-      <td colSpan={12} className="px-4 py-3">
-        <div className="flex items-start justify-between mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">Quick Summary</span>
+    <tr className="bg-[#0b1220]/90 border-b border-slate-800">
+      <td colSpan={12} className="px-5 py-3.5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Quick Event Overview</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${actionClass}`}>
+              {actionText.toUpperCase()}
+            </span>
+          </div>
           <button
             onClick={onOpenDetail}
-            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-sm transition-all"
           >
-            <ExternalLink size={11} /> Full Event Details
+            <ExternalLink size={12} />
+            <span>Open Event Inspector</span>
           </button>
         </div>
-        <div className="grid grid-cols-4 gap-x-6 gap-y-2 text-xs">
-          {[
-            ['Hostname',    log.hostname],
-            ['Username',    log.username],
-            ['Source IP',   log.sourceIp],
-            ['Dest IP',     log.destinationIp],
-            ['Log Type',    log.logType],
-            ['MITRE Tactic',log.mitreTactic],
-            ['MITRE Technique', log.mitreTechnique],
-            ['Event Name',  getEventName(log)],
-          ].map(([label, value]) => (
-            <div key={label as string}>
-              <div className="text-[10px] text-[var(--text-secondary)] mb-0.5">{label}</div>
-              <div className="font-mono text-[var(--text-primary)] truncate max-w-[180px]" title={value ?? undefined}>
-                {value || <span className="text-[var(--text-secondary)]">–</span>}
-              </div>
+
+        {/* Mini Flow + Key Attributes */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-[#080d18] p-3 rounded-lg border border-slate-800/80 mb-3 text-xs">
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Source</div>
+            <div className="font-mono text-slate-100 font-semibold mt-0.5 truncate">
+              {log.sourceIp ? `${log.sourceIp}${parsed.srcPort ? ':' + parsed.srcPort : ''}` : (log.hostname || '—')}
             </div>
-          ))}
+            <div className="text-[10px] text-slate-400 mt-0.5">{log.source || 'Generic'}</div>
+          </div>
+
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Destination</div>
+            <div className="font-mono text-slate-100 font-semibold mt-0.5 truncate">
+              {log.destinationIp ? `${log.destinationIp}${parsed.dstPort ? ':' + parsed.dstPort : ''}` : '—'}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-0.5">{parsed.service || parsed.protocol || 'Traffic'}</div>
+          </div>
+
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Event Identity</div>
+            <div className="font-mono text-slate-100 font-semibold mt-0.5 truncate">
+              {log.eventId ?? '—'}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-0.5">{effectiveLogType}</div>
+          </div>
+
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Security Context</div>
+            <div className="text-slate-200 mt-0.5 truncate font-medium">
+              {parsed.attack || log.mitreTechnique || getEventName(log)}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-0.5">{log.username || 'System User'}</div>
+          </div>
         </div>
-        {/* raw message preview */}
-        {log.rawLog && (
-          <div className="mt-3">
-            <div className="text-[10px] text-[var(--text-secondary)] mb-1">Raw Message</div>
-            <pre className="text-[11px] font-mono bg-black/40 border border-[var(--border-color)] rounded p-2.5 text-green-400 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
-              {typeof log.rawLog === 'string' ? log.rawLog : JSON.stringify(log.rawLog, null, 2)}
+
+        {/* Clean Raw Message Preview */}
+        {parsed.cleanLine && (
+          <div>
+            <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">
+              Raw Message Preview
+            </div>
+            <pre className="text-xs font-mono bg-[#060910] border border-slate-800/80 rounded-lg p-2.5 text-slate-300 max-h-36 overflow-y-auto whitespace-pre-wrap break-all leading-relaxed">
+              {parsed.cleanLine}
             </pre>
           </div>
         )}
@@ -518,7 +950,7 @@ export default function LogsPage() {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* ── main area ── */}
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all ${selectedLog ? 'mr-[560px]' : ''}`}>
+      <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* ── top toolbar ── */}
         <div className="flex items-center px-4 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card)] shrink-0 gap-2 flex-wrap">

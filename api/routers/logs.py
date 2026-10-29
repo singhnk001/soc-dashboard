@@ -258,12 +258,24 @@ def get_logs(
         ts_val = r["timestamp"]
         ts_str = ts_val.isoformat() if hasattr(ts_val, "isoformat") else str(ts_val) if ts_val else None
 
+        lt = r["log_type"]
+        if not lt:
+            src_l = (r["source"] or "").lower()
+            if "fortinet" in src_l or "firewall" in src_l or "palo" in src_l:
+                lt = "Firewall"
+            elif "syslog" in src_l or "linux" in src_l:
+                lt = "Linux Syslog"
+            elif "security" in src_l or "powershell" in src_l or "system" in src_l:
+                lt = "Windows Event"
+            else:
+                lt = "Security Event"
+
         formatted_logs.append({
             "id":            r["id"],
             "timestamp":     ts_str,
             "source":        r["source"],
             "eventId":       r["event_id"],
-            "logType":       r["log_type"] or "Windows Event",
+            "logType":       lt,
             "severity":      norm_sev,
             "sourceIp":      r["source_ip"],
             "destinationIp": r["destination_ip"],
