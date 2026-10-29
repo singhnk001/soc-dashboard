@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { referenceSetsService } from '@/services/reference-sets.service';
 import { Database, Plus, Trash2, Search, X, Loader2, List, FileJson, Clock, User as UserIcon, Upload } from 'lucide-react';
 import { useRef } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { safeDistanceToNow } from '@/lib/date-utils';
 import { DEMO_REFERENCE_SETS, DEMO_REFERENCE_ITEMS } from '@/lib/demo-data';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
@@ -28,7 +28,7 @@ export default function ReferenceSetsPage() {
   const { data: setsData, mutate: mutateSets } = useSWR('/api/reference-sets', fetcher, { refreshInterval, fallbackData: { data: DEMO_REFERENCE_SETS } });
   const sets = setsData?.data || [];
   
-  const [activeSetId, setActiveSetId] = useState<string | null>('ref-01');
+  const [activeSetId, setActiveSetId] = useState<string | null>('rs-01');
   const { data: itemsData, mutate: mutateItems, isLoading: itemsLoading } = useSWR(
     activeSetId ? `/api/reference-sets/${activeSetId}/items` : null, 
     fetcher
@@ -234,7 +234,7 @@ export default function ReferenceSetsPage() {
                 <div className="flex justify-between items-center mt-2 text-xs">
                   <span className="text-[var(--text-secondary)] flex items-center gap-1"><FileJson size={12}/> {s.type}</span>
                   <span className="bg-[var(--bg-secondary)] border border-[var(--border-color)] px-2 py-0.5 rounded-full text-[var(--text-secondary)] font-mono">
-                    {s.count.toLocaleString()}
+                    {(s.count ?? 0).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -322,7 +322,7 @@ export default function ReferenceSetsPage() {
                           <td className="px-5 py-3 text-[var(--text-secondary)]">
                             <div className="flex items-center gap-1.5">
                               <Clock size={12}/> 
-                              {item.added_at ? formatDistanceToNow(new Date(item.added_at.replace(' ', 'T') + 'Z')) + ' ago' : 'Unknown'}
+                              {safeDistanceToNow(item.added_at)}
                             </div>
                           </td>
                           <td className="px-5 py-3 text-right">

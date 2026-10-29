@@ -14,12 +14,11 @@
   --accent-red: #ef4444;
   --accent-yellow: #f59e0b;
   --accent-green: #22c55e;
-  
-  --app-scale: 0.75;
 }
 
-/* Full-viewport reset to cover 100% of the screen with 75% comfortable enterprise density */
-html {
+/* Full-viewport coverage: 100% height and width without coordinate distortion */
+html,
+body {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -40,17 +39,8 @@ html {
 }
 
 body {
-  margin: 0;
-  padding: 0;
-  background-color: var(--bg-primary);
   color: var(--text-primary);
   cursor: default;
-  overflow: hidden;
-  zoom: var(--app-scale, 0.75);
-  width: calc(100vw / var(--app-scale, 0.75));
-  height: calc(100vh / var(--app-scale, 0.75));
-  min-width: calc(100vw / var(--app-scale, 0.75));
-  min-height: calc(100vh / var(--app-scale, 0.75));
 }
 
 /* Custom Scrollbar */

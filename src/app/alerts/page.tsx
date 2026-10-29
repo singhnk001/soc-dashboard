@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { safeDistanceToNow } from '@/lib/date-utils';
 import { ShieldAlert, Clock, CheckCircle2, List, Loader2, ThumbsUp, ThumbsDown, Save, ChevronDown, ChevronRight, Download, User } from 'lucide-react';
 import useSWR, { mutate } from 'swr';
 import TIEnrichment from '@/components/TIEnrichment';
@@ -279,7 +279,7 @@ export default function AlertsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[var(--text-secondary)] text-xs whitespace-nowrap">
-                      {formatDistanceToNow(new Date(alert.timestamp))} ago
+                      {safeDistanceToNow(alert.timestamp)}
                     </td>
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex gap-1">

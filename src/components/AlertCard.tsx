@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { safeDistanceToNow } from '@/lib/date-utils';
 import { Alert } from '@/lib/types';
 import { ShieldAlert, CheckCircle2, Clock, X, ThumbsUp, ThumbsDown, Save } from 'lucide-react';
 import { mutate } from 'swr';
@@ -61,7 +61,7 @@ export default function AlertCard({ alert }: AlertCardProps) {
         <div className="flex justify-between items-start mb-2">
           <div>
             <h4 className="text-[var(--text-primary)] font-medium text-lg">{alert.title}</h4>
-            <span className="text-sm text-[var(--text-secondary)]">Source: {alert.source} • {formatDistanceToNow(new Date(alert.timestamp))} ago</span>
+            <span className="text-sm text-[var(--text-secondary)]">Source: {alert.source} • {safeDistanceToNow(alert.timestamp)}</span>
           </div>
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[alert.status].color}`}>
             {statusConfig[alert.status].pulse && (

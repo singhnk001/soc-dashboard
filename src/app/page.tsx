@@ -12,7 +12,7 @@ import TopEventsChart from '@/components/TopEventsChart';
 import TopSourcesChart from '@/components/TopSourcesChart';
 import MitreActivityChart from '@/components/MitreActivityChart';
 import AlertRateWidget from '@/components/AlertRateWidget';
-import { formatDistanceToNow } from 'date-fns';
+import { safeDistanceToNow } from '@/lib/date-utils';
 import { systemService, alertsService } from '@/services';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { DashboardStats } from '@/lib/types';
@@ -264,7 +264,7 @@ export default function DashboardPage() {
           {/* Last fetch */}
           {lastFetch && (
             <span className="text-xs text-[var(--text-secondary)] hidden sm:block">
-              Updated {formatDistanceToNow(lastFetch)} ago
+              Updated {safeDistanceToNow(lastFetch)}
             </span>
           )}
 
@@ -514,7 +514,7 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-4 py-3 text-[var(--text-secondary)] text-xs whitespace-nowrap">
                         {(() => {
-                          try { return formatDistanceToNow(new Date(alert.timestamp)) + ' ago'; }
+                          try { return safeDistanceToNow(alert.timestamp); }
                           catch { return alert.timestamp || '—'; }
                         })()}
                       </td>

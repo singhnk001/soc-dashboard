@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { sourcesService } from '@/services/sources.service';
 import { Loader2, Server, Cloud, ShieldCheck, AlertCircle, Plus, X, Box, Shield, CheckCircle, Edit, Trash2, ChevronDown, ChevronRight, Activity, Network } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { safeDistanceToNow } from '@/lib/date-utils';
 import { DEMO_SOURCES, DEMO_API_SOURCES } from '@/lib/demo-data';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json()).catch(err => {
@@ -254,7 +254,7 @@ export default function SourcesPage() {
                             <div>
                               <div className="text-xs text-[var(--text-secondary)] uppercase font-semibold mb-1">Last Seen</div>
                               <div className="text-sm text-[var(--text-secondary)]">
-                                {(() => { const raw = source.lastSeen || source.last_seen; const d = raw ? new Date(raw) : null; return d && !isNaN(d.getTime()) ? formatDistanceToNow(d) + ' ago' : 'Just now'; })()}
+                                {(() => { const raw = source.lastSeen || source.last_seen; const d = raw ? new Date(raw) : null; return d && !isNaN(d.getTime()) ? safeDistanceToNow(d) : 'Just now'; })()}
                               </div>
                             </div>
                           </div>

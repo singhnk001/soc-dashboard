@@ -9,7 +9,7 @@ import {
   Cpu, HardDrive, Clock, Radio, Wifi, WifiOff, RefreshCw, Monitor,
   Shield, AlertTriangle, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { safeDistanceToNow } from '@/lib/date-utils';
 
 const fetcher = (url: string) =>
   fetch(url).then(r => {
@@ -145,7 +145,7 @@ export default function TroubleshootingPage() {
           </div>
           <div className="text-2xl font-semibold">
             {health?.boot_time
-              ? formatDistanceToNow(new Date(health.boot_time * 1000)).replace('about ', '')
+              ? safeDistanceToNow(health.boot_time, '--').replace('about ', '')
               : '--'}
           </div>
         </div>
@@ -191,7 +191,7 @@ export default function TroubleshootingPage() {
                     <td className="px-5 py-3.5 font-mono text-xs text-[var(--text-secondary)]">{s.pid || '—'}</td>
                     <td className="px-5 py-3.5 text-xs text-[var(--text-secondary)]">
                       {s.started_at
-                        ? formatDistanceToNow(new Date(s.started_at * 1000), { addSuffix: true })
+                        ? safeDistanceToNow(s.started_at, '—')
                         : '—'}
                     </td>
                     <td className="px-5 py-3.5 font-mono text-xs text-[var(--text-secondary)]">
@@ -300,7 +300,7 @@ export default function TroubleshootingPage() {
                           if (!d || isNaN(d.getTime())) return '—';
                           return (
                             <span title={d.toLocaleString()} className="cursor-default">
-                              {formatDistanceToNow(d, { addSuffix: true })}
+                              {safeDistanceToNow(d, '—')}
                               <span className="block text-[10px] opacity-60">
                                 {d.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                               </span>

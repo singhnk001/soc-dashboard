@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,35 +24,25 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `(function(){
               try {
-                var s = localStorage.getItem('soc_display_scale') || '0.75';
-                var n = parseFloat(s) || 0.75;
-                document.documentElement.style.setProperty('--app-scale', s);
-                if (document.documentElement) {
-                  document.documentElement.style.zoom = '';
-                }
-                var apply = function() {
-                  if (document.body) {
-                    document.body.style.zoom = s;
-                    document.body.style.width = 'calc(100vw / ' + n + ')';
-                    document.body.style.height = 'calc(100vh / ' + n + ')';
-                  }
-                };
-                if (document.readyState === 'loading') {
-                  document.addEventListener('DOMContentLoaded', apply);
-                } else {
-                  apply();
+                if (document.documentElement) document.documentElement.style.zoom = '';
+                if (document.body) {
+                  document.body.style.zoom = '';
+                  document.body.style.width = '';
+                  document.body.style.height = '';
                 }
               } catch(e) {}
             })();`,
           }}
         />
       </head>
-      <body className={`${inter.className} flex overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
+      <body className={`${inter.className} flex h-screen w-full overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
         <Sidebar />
         <div className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
           <Header />
           <main className="flex-1 overflow-y-auto min-h-0 bg-[var(--bg-secondary)]">
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </main>
         </div>
       </body>

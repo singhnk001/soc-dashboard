@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { ShieldAlert, Check, X, Search, Plus, RefreshCw, Trash2, Edit2, ChevronDown, ChevronRight, Download, Upload, Server, FileSearch, Globe, Code, Settings } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { safeDistanceToNow } from '@/lib/date-utils';
 import { threatIntelService, systemService } from "@/services";
 import { DEMO_THREAT_FEEDS, getDemoIndicatorsForFeed } from "@/lib/demo-data";
 
@@ -527,7 +527,7 @@ export default function ThreatIntelPage() {
                         <td className="px-4 py-4 font-mono text-[var(--text-secondary)]">{(f.indicator_count || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 text-[var(--text-secondary)]">{f.schedule}</td>
                         <td className="px-4 py-4 text-[var(--text-secondary)]">
-                          {f.last_updated ? formatDistanceToNow(new Date(f.last_updated)) + ' ago' : 'Never'}
+                          {safeDistanceToNow(f.last_updated, 'Never')}
                         </td>
                         <td className="px-4 py-4 text-right">
                           {canEdit && (
