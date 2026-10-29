@@ -1,6 +1,6 @@
 # Memory — SOC Dashboard
 
-Running log of known issues, resolved bugs, and current system state. Update this when something changes.
+Running log of system architecture, known issues, resolved bugs, and current operational state. Update this file whenever modifications are made.
 
 ---
 
@@ -8,56 +8,56 @@ Running log of known issues, resolved bugs, and current system state. Update thi
 
 | Component | Status | Notes |
 |---|---|---|
-| PostgreSQL `SOC_DB` | ✅ Running | localhost:5432, ~262k logs |
-| FastAPI API | ✅ Running | 0.0.0.0:8001, --workers 1 |
-| Next.js Frontend | ✅ Running | 0.0.0.0:3000 |
-| VectorAgent (Windows Service) | ⚠️ Check | Was stopped during Oct 6 troubleshooting; may need restart |
-| TI Feeds | ✅ Loaded | ~66k indicators in `threat_indicators` |
+| Production Vercel App | ✅ Live | `https://soc-dashboard-soc-deployment.vercel.app` |
+| PostgreSQL `SOC_DB` | ✅ Running | `localhost:5432`, ~262k logs |
+| FastAPI API | ✅ Running | `0.0.0.0:8001`, `--workers 1` |
+| Next.js Frontend | ✅ Live | Standard responsive layout, `h-screen w-full` |
+| VectorAgent (Windows Service) | ✅ Configured | Service context LocalSystem, batches Event IDs ≤20 |
+| Threat Intelligence Feeds | ✅ Active | AlienVault OTX, ThreatFox, URLhaus, CISA KEV, AbuseIPDB |
+| Demo & Role Access | ✅ Active | 1-Click Demo Login (`demo`/`demo123`), Admin Login (`admin`) |
+| Client Error Boundary | ✅ Active | `src/components/common/ErrorBoundary.tsx` wrapping main layout |
 
 ---
 
-## Known Issues / Quirks
+## Known Issues, Quirks & Workarounds
 
-### API
-- `init_db()` runs at module import time (not in `@app.on_event("startup")`). With `--workers 2+` this causes DDL lock contention — **always start with `--workers 1`**
-- `/api/otx/status` takes 5-60s to respond (external HTTP call to AlienVault with no short timeout)
-- Security log XPath: Windows rejects queries > ~1000 chars — `collect-events.ps1` batches Event IDs in groups of 20
+### Authentication & Sessions
+- **Cookie vs SessionStorage:** The primary server-side session check is the `soc_session` HTTP cookie. `Header.tsx` checks this cookie on route change. Never delete the cookie if `sessionStorage` is merely unhydrated; always restore `sessionStorage` from the cookie.
+- **Inactivity Timeout:** Defaulted to 30 minutes (1,800s). Reset on every `pathname` change and user activity. Minimum clamp is 10 minutes.
 
-### Vector
-- `collect-events.ps1` runs as LocalSystem (via service) — can read Security log
-- Running the script in a non-admin shell returns "Access Denied" on Security log — this is expected
-- State files: `vector/data/state_Security.txt`, `state_System.txt`, `state_Application.txt` — store last processed RecordId
-- If no new events match the allowlist, Vector produces 0 output and the log count stays flat — this is correct behaviour
+### Rendering & Date Calculations
+- **Never call raw `formatDistanceToNow` on arbitrary dates:** An `Invalid Date` object causes `date-fns` to throw a fatal `RangeError: Invalid time value`. Always use `safeDistanceToNow` from `src/lib/date-utils.ts`.
+- **Avoid CSS `zoom` on `body` or `html`:** Setting `zoom: 0.75` in Chromium breaks `100vh` and causes bottom 25-35% black voids on containers using `min-h-screen` (like `/login`). Use native CSS responsive padding, flexbox, and standard viewport metrics instead.
 
-### Frontend
-- `logs/page.tsx` defaults to "All Time" on load — do NOT change back to "Last 1h" (logs stop flowing when Vector is idle)
-- `src/lib/mock-data.ts` contains demo data — it is imported by the dashboard home page for chart fallback data; do not delete
+### Backend & Database
+- `init_db()` runs at module import time. Always run uvicorn with `--workers 1` to prevent DDL lock contention on the 260k-row `logs` table.
+- `/api/otx/status` performs external calls to AlienVault; fallback and abort signals are required to prevent UI blocking.
+- Security log XPath: Windows rejects queries > ~1000 chars. `collect-events.ps1` batches Event IDs in groups of ≤20.
 
 ---
 
-## Critical Lessons (from fixes applied Oct 2026)
+## Critical Lessons Learned (Oct 2026)
 
-1. **XPath length limit:** Windows Security log XPath queries have a ~1000-char limit. Batch Event IDs in groups of ≤20.
-2. **psycopg3 DictRow unpacking:** Tuple unpacking (`for a, b in rows`) unpacks dict **keys**, not values. Use `r["column_name"]` always.
-3. **PostgreSQL DDL in exception handlers:** If `ALTER TABLE` fails inside a `try/except`, call `conn.rollback()` before any subsequent `SELECT` — otherwise the transaction stays aborted and all queries return nothing.
-4. **0.0.0.0 vs 127.0.0.1:** Vector Windows Service (LocalSystem) can reach `0.0.0.0:8001` but not reliably `127.0.0.1:8001` in all contexts. Always bind to `0.0.0.0`.
-5. **Histogram SQL params:** The histogram query uses separate `hist_params` — never pass the main `params` list to it when `where` clause is empty (no `%s` placeholders → psycopg3 raises parameter count error).
+1. **Date Validation in Render Trees:** In `reference-sets/page.tsx:325`, appending `'Z'` to an already-valid ISO string produced `"2026-10-29T21:02:37.000ZZ"`. `new Date("...ZZ")` returns `Invalid Date`. When passed to `formatDistanceToNow`, it crashed the entire page with `"Application error: a client-side exception has occurred"`. Always sanitize and validate via `safeDistanceToNow`.
+2. **Session Preservation Across Route Transitions:** When using client-side navigation (`Link`), components can re-render before `sessionStorage` is read. If an auth guard checks `!sessionStorage.getItem()` and immediately clears cookies, it creates an infinite logout loop. Always check the cookie before evicting a session.
+3. **PowerShell Text Encoding:** When modifying code files using PowerShell scripts, Windows PowerShell 5.1 defaults to ANSI or UTF-16 LE if `-Encoding utf8` is omitted, causing Webpack/Turbopack compilation errors (`stream did not contain valid UTF-8`). Always use UTF-8 or Node.js scripts for file transformations.
+4. **XPath Length Limit:** Windows Security log XPath queries have a ~1000-char limit. Batch Event IDs in groups of ≤20.
+5. **psycopg3 DictRow Unpacking:** Tuple unpacking (`for a, b in rows`) unpacks dict **keys**, not values. Always use `r["column_name"]`.
 
 ---
 
-## How to Start Everything
+## How to Run & Verify
 
 ```powershell
 # 1. Start API (from D:\SOC-Dashboard\Dashboard)
 python -m uvicorn api.index:app --host 0.0.0.0 --port 8001 --workers 1
 
-# 2. Start Frontend (separate terminal)
+# 2. Start Frontend
 npm run dev
 
-# 3. Check Vector service
+# 3. Production Build Verification
+npm run build
+
+# 4. Check Vector Service
 Get-Service VectorAgent
-# If stopped:
-Start-Service VectorAgent  # requires admin, OR
-# start manually (no admin needed):
-Start-Process "vector\bin\vector.exe" -ArgumentList "--config vector\vector-windows-agent.toml" -WorkingDirectory "D:\SOC-Dashboard\Dashboard" -WindowStyle Hidden
 ```

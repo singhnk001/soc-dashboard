@@ -38,3 +38,27 @@
 ## ADR-009: Collectors directory removed
 **Decision:** Deleted `collectors/` directory (`windows_collector.py`, `linux_collector.py`).  
 **Reason:** Both are superseded by the Vector agent architecture. The Windows collector was replaced by `vector/collect-events.ps1` + VectorAgent service. The Linux collector is not in use (no Linux sources configured).
+
+## ADR-010: Safe Date Parsing & Client-Side Exception Prevention (`date-utils.ts`)
+**Decision:** All relative and formatted date calculations use `safeDistanceToNow` and `safeFormatDate` from `src/lib/date-utils.ts` instead of directly invoking `date-fns/formatDistanceToNow`.  
+**Reason:** In `reference-sets/page.tsx:325`, appending a `'Z'` to an already-valid UTC ISO timestamp produced `...ZZ`, which evaluated to `Invalid Date`. Calling `formatDistanceToNow` on an `Invalid Date` throws an unhandled `RangeError: Invalid time value`, crashing Next.js during React rendering with `"Application error: a client-side exception has occurred"`.  
+**Impact:** `safeDistanceToNow` validates input types, checks `!isNaN(d.getTime())`, catches exceptions internally, and always returns a safe fallback string without throwing.
+
+## ADR-011: Global React Error Boundary for Route Fault Tolerance
+**Decision:** Wrap `{children}` in `src/app/layout.tsx` with `<ErrorBoundary>` (`src/components/common/ErrorBoundary.tsx`).  
+**Reason:** Next.js App Router by default crashes the entire route when a component throws during rendering. A global Error Boundary intercepts rendering exceptions, logs diagnostics, and displays a user-friendly recovery card with a one-click "Refresh View" button rather than a blank fatal screen.
+
+## ADR-012: Cookie-Prioritized Session Hydration & Inactivity Timer Hardening
+**Decision:** Updated `src/components/Header.tsx` to prioritize the HTTP session cookie (`soc_session`) over client `sessionStorage` and reset idle timeout on every navigation event (`pathname` change).  
+**Reason:** Previously, `Header.tsx` aggressively wiped the cookie and called `router.push('/login')` whenever `sessionStorage.getItem('soc_user')` was momentarily null during client navigation. Additionally, an uninitialized `timeLeft` (90s) caused immediate logouts on navigation.  
+**Impact:** If `soc_session` cookie is present, `Header.tsx` automatically restores `sessionStorage` state. Navigating across sidebar links now registers as active engagement, resetting the 30-minute idle countdown. A redirect to `/login` only occurs if both the cookie and `sessionStorage` are absent.
+
+## ADR-013: Full-Viewport Standard Layout (Removal of CSS Zoom Hacks)
+**Decision:** Removed all CSS `zoom` and `calc(100vw / scale)` hacks from `body` and `html`. Configured `html, body` with standard `height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; background-color: var(--bg-primary);`. Set `/login` to `h-screen w-full`.  
+**Reason:** CSS `zoom` on `body` or `html` in Chromium breaks `100vh` viewport calculations, causing child containers with `min-h-screen` or `100vh` to stop 25-35% short of the physical monitor bottom, creating an empty dark void.  
+**Impact:** 100% full-screen coverage across desktop, laptop, and mobile screens without black voids or clipping.
+
+## ADR-014: High-Density Sidebar Scaling & Responsive Proportions
+**Decision:** Expanded sidebar width from `w-60` (240px) to `w-64` (256px), increased navigation font size to `text-sm font-semibold` (14px), increased icon sizes to `size={19}`, and enhanced status footer contrast.  
+**Reason:** When users set browser zoom to 75% or viewed on high-DPI displays, the previous `text-xs` (12px) shrank to an unreadable 9px.  
+**Impact:** Crystal-clear legibility and comfortable enterprise ergonomics across all display resolutions.
