@@ -159,3 +159,37 @@
 - Explicitly casting `timestamp::timestamptz` resolves the type mismatch and guarantees alert creation.
 **Impact:**
 - Any log containing an IP, domain, URL, or hash that matches any active Threat Intel feed (ThreatFox, AlienVault OTX, AbuseIPDB, CISA KEV) immediately triggers an automated `[TI Match]` alert with full attribution and MITRE Tactic tagging.
+
+
+## ADR-022: Industry-Standard SOC Alerts Triage Workspace & Analyst Assignment Redesign
+**Decision:**
+1. **Complete Alerts Page Redesign (`src/app/alerts/page.tsx`)**:
+   - Completely redesigned the alerts triage interface to match the quality, dark slate aesthetic (`#0a0f1d`, `#0c1220`, `#0e1626`, `#11192a`), and ergonomics of the Logs page Event Inspector (referencing CrowdStrike Falcon, Microsoft Sentinel, and Splunk ES).
+   - Eliminated unformatted raw JSON dumps and green courier text ("waste data"), replacing them with structured attribute tables, telemetry flow visualizers, and threat correlation cards.
+   - Added a top **SOC Command Metrics Summary Bar** (Total Alerts, Critical/High Priority, Active Investigations, Unassigned Triage Queue, Resolved Incidents).
+   - Added **Telemetry Flow Preview** directly in each row of the alerts table (`Source IP:port ➔ Target IP:port` + Action badge), providing instant network situational awareness without needing to click into the alert.
+2. **Dynamic SIEM Analyst User Assignment**:
+   - Integrated live analyst user accounts dynamically loaded from the SIEM database (`GET /api/users` via `authService.getUsers()`). Analysts can assign alerts to real users created on the SIEM (`Administrator`, `Aditya`, `Manish Raj`, `Neha Prasad`, `Prince K`, `Vishal B`) instead of hardcoded dummy strings (`L1 Analyst`, `L2 Analyst`).
+   - Added a 1-click **"Assign to Me"** button for immediate analyst ownership.
+   - Added an inline **"+ Assign Analyst"** dropdown directly within the alerts table for rapid queue triage.
+   - Implemented multi-select row checkboxes and a **Bulk Actions Toolbar** allowing analysts to batch-assign multiple alerts to any analyst or batch-resolve incidents in one click.
+3. **Comprehensive Incident Investigation Slide-Over Inspector**:
+   - Built a sleek right-side slide-over drawer matching the Logs page Event Inspector:
+     - Header with severity badge, source sensor, timestamp, and quick copy actions.
+     - **Analyst Triage & Lifecycle Command Bar** with live assignee selector, "Assign to Me" button, and status workflow controls (New ➔ Investigating ➔ Resolve).
+     - **Connection & Telemetry Flow Hero Visualizer** (Client Inbound Node ➔ Flow Arrow ➔ Target Node) with 1-click IP copy.
+     - **Threat Intelligence & Intrusion Correlation Banner** with Attack Signature card, Signature ID card (e.g., `FG-IPS-47910`, `FG-IPS-39812`) with 1-click copy, Detected Threat Feed badge (`AlienVault OTX Community Feed`, `ThreatFox (abuse.ch)`, `AbuseIPDB`, `CISA KEV`), and Confidence Score radar pill.
+     - **Investigation Tabs**:
+       - Tab 1: **Overview & Fields** with real-time attribute search filter and structured key-value rendering.
+       - Tab 2: **Key-Value Tags** with extracted telemetry tags.
+       - Tab 3: **Raw Message & Forensics** with clean monospace formatting and copy payload button.
+       - Tab 4: **Investigation Timeline & Analyst Notes** with audit timeline, comments history, and new note authoring.
+4. **Backend & Service Layer Enhancements**:
+   - Enhanced `api/routers/alerts.py` to support `search` and `assigned_to` filtering.
+   - Added `POST /api/alerts/bulk` endpoint for atomic batch assignment and resolution.
+   - Enhanced `src/services/alerts.service.ts` with `bulkUpdateAlerts()` and search/assignee parameters.
+**Reason:**
+- The previous Alerts page presented cluttered, unparsed raw log blobs in green console font, displayed "TI lookup failed" errors, had hardcoded dummy analyst levels, and lacked connection flow visualization and bulk triage capabilities.
+- Matching the Logs page Event Inspector standard provides tier-1/tier-2/tier-3 SOC analysts with an enterprise-grade investigation and case triage experience.
+**Impact:**
+- Streamlined alert triage workflow, reduced Mean Time to Triage (MTTT) and Mean Time to Respond (MTTR), eliminated eye strain with high-comfort dark slate theme, and enabled real analyst accountability with dynamic user assignments.

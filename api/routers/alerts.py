@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Query, HTTPException
 from api.core.database import get_db
-from api.models.alert import AlertCreate, StatusUpdate, AlertCommentRequest
+from api.models.alert import AlertCreate, StatusUpdate, AlertCommentRequest, BulkAlertUpdate
 
 router = APIRouter(tags=["Alerts"])
 
@@ -17,10 +17,12 @@ router = APIRouter(tags=["Alerts"])
 def get_alerts(
     status: Optional[str] = None,
     severity: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    search: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
 ):
-    """Retrieve alerts with pagination and status/severity filters."""
+    """Retrieve alerts with pagination and status/severity/assignee/search filters."""
     conditions = []
     params: list = []
 
@@ -30,6 +32,16 @@ def get_alerts(
     if severity and severity.lower() != "all":
         conditions.append("severity = %s")
         params.append(severity)
+    if assigned_to and assigned_to.lower() != "all":
+        if assigned_to.lower() == "unassigned":
+            conditions.append("(assigned_to IS NULL OR assigned_to = '')")
+        else:
+            conditions.append("assigned_to = %s")
+            params.append(assigned_to)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        conditions.append("(title ILIKE %s OR description ILIKE %s OR source ILIKE %s OR raw_log ILIKE %s)")
+        params.extend([term, term, term, term])
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -40,7 +52,7 @@ def get_alerts(
 
         offset = (page - 1) * limit
         cur.execute(
-            f"SELECT * FROM alerts {where} ORDER BY timestamp DESC LIMIT %s OFFSET %s",
+            f"SELECT * FROM alerts {where} ORDER BY timestamp::timestamptz DESC LIMIT %s OFFSET %s",
             params + [limit, offset]
         )
         rows = cur.fetchall()
@@ -51,6 +63,50 @@ def get_alerts(
         "page": page,
         "limit": limit,
     }
+
+@router.post("/api/alerts/bulk")
+def bulk_update_alerts(bulk: BulkAlertUpdate):
+    """Batch update multiple alerts (assignee, status, resolution, notes)."""
+    if not bulk.alert_ids:
+        return {"updated_count": 0}
+
+    fields = ["updated_at = CURRENT_TIMESTAMP"]
+    params = []
+
+    if bulk.status is not None:
+        fields.append("status = %s")
+        params.append(bulk.status)
+    if bulk.resolution_type is not None:
+        fields.append("resolution_type = %s")
+        params.append(bulk.resolution_type)
+    if bulk.assigned_to is not None:
+        fields.append("assigned_to = %s")
+        params.append(bulk.assigned_to)
+    if bulk.notes is not None:
+        fields.append("notes = %s")
+        params.append(bulk.notes)
+
+    if len(fields) == 1:
+        return {"updated_count": 0}
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Create placeholders for IN clause
+        placeholders = ", ".join(["%s"] * len(bulk.alert_ids))
+        all_params = params + bulk.alert_ids
+        cursor.execute(f"UPDATE alerts SET {', '.join(fields)} WHERE id IN ({placeholders})", all_params)
+        count = cursor.rowcount
+
+        if bulk.notes:
+            for aid in bulk.alert_ids:
+                cid = str(uuid.uuid4())
+                cursor.execute(
+                    'INSERT INTO alert_comments (id, alert_id, "user", comment) VALUES (%s, %s, %s, %s)',
+                    (cid, aid, "System", f"Bulk update: {bulk.notes}")
+                )
+        conn.commit()
+
+    return {"updated_count": count}
 
 @router.post("/api/alerts")
 def create_alert(alert: AlertCreate):

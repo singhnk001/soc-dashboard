@@ -6,16 +6,19 @@ This document provides exact step-by-step instructions to roll back changes made
 
 ## 1. Quick Git Rollback Checkpoints
 
-### Current Checkpoint (ADR-021: Automated Threat Intelligence Alert Generation & Timestamp Cast Hardening)
+### Current Checkpoint (ADR-022: Industry-Standard SOC Alerts Triage Workspace & Analyst Assignment Redesign)
 - **Commit:** Latest on `main`
 - **Features:** 
-  - Automated `[TI Match]` alert creation whenever an ingested log matches any indicator in the 69,000+ `threat_indicators` table (ThreatFox, AlienVault OTX, AbuseIPDB, CISA KEV).
-  - Explicit `alerts.timestamp::timestamptz` type casting preventing PostgreSQL transaction aborts.
-  - Substring matching for `ip:port` indicators via `SPLIT_PART(ti.indicator, ':', 1)`.
-  - Bi-directional Threat Intelligence correlation across both Source IP and Destination IP.
-  - Explicit `Signature ID` and `Detected Threat Intel Feed` attribution.
+  - Complete redesign of `src/app/alerts/page.tsx` with high-visibility dark slate theme (`#0a0f1d`, `#0c1220`, `#0e1626`).
+  - Dynamic SIEM analyst user assignment dropdown fetching real users from `/api/users`.
+  - 1-Click "Assign to Me" button and table row "+ Assign Analyst" fast triage selector.
+  - Telemetry flow preview in table rows (`Source IP:port ➔ Target IP:port` + Action badge).
+  - Bulk actions toolbar for batch assignment and multi-incident resolution.
+  - Incident investigation slide-over inspector with connection flow, threat correlation (Signature ID, Attack Name, Feed attribution, Confidence score), and 4 tabs (Overview & Fields with search, Tags, Raw Log, Timeline & Notes).
+  - Backend API enhancements in `api/routers/alerts.py` (`search`, `assigned_to`, and `POST /api/alerts/bulk`).
 
 ### Previous Checkpoints:
+- **`1596762`:** Automated Threat Intelligence Alert Generation & Timestamp Cast Hardening (ADR-021).
 - **`21cc580`:** Bi-directional (Source & Destination IP) TI correlation (ADR-020).
 - **`84775ac`:** Explicit Signature ID & Detected Threat Intel Feed Attribution (ADR-019).
 - **`72b9a1e`:** Event Inspector UX & Ergonomics redesign (dark slate theme, connection flow hero, 3 tabs).

@@ -21,6 +21,13 @@ class StatusUpdate(BaseModel):
     resolution_type: Optional[str] = None
     notes: Optional[str] = None
 
+class BulkAlertUpdate(BaseModel):
+    alert_ids: list[str]
+    status: Optional[str] = None
+    assigned_to: Optional[str] = None
+    resolution_type: Optional[str] = None
+    notes: Optional[str] = None
+
 class AlertCommentRequest(BaseModel):
     user: str
     comment: str

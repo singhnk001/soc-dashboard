@@ -16,11 +16,21 @@ export interface AlertsResponse {
 export interface GetAlertsParams {
   status?: string;
   severity?: string;
+  assigned_to?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }
 
 export interface UpdateAlertPayload {
+  status?: string;
+  assigned_to?: string;
+  resolution_type?: string;
+  notes?: string;
+}
+
+export interface BulkUpdateAlertsPayload {
+  alert_ids: string[];
   status?: string;
   assigned_to?: string;
   resolution_type?: string;
@@ -36,6 +46,9 @@ export const alertsService = {
 
   updateAlert: (id: string, payload: UpdateAlertPayload) =>
     apiClient.patch<{ success: boolean }>(`/api/alerts/${id}`, payload),
+
+  bulkUpdateAlerts: (payload: BulkUpdateAlertsPayload) =>
+    apiClient.post<{ updated_count: number }>('/api/alerts/bulk', payload),
 
   getComments: (alertId: string) =>
     apiClient.get<{ data: AlertComment[] }>(`/api/alerts/${alertId}/comments`),
