@@ -90,8 +90,17 @@ def generate_fortinet_event():
     epoch_ns = int(now.timestamp() * 1e9)
     src_ip = random.choice(INTERNAL_SUBNETS) + str(random.randint(10, 240))
     src_port = random.randint(32768, 65530)
+    dst_ip = random.choice(BENIGN_INTERNET_IPS)
+    dst_port = 443
     session_id = random.randint(100000, 999999)
     policy_id = random.randint(1, 25)
+    action = "accept"
+    level = "notice"
+    severity = "info"
+    event_id = "FG-TRAFFIC-ACCEPT"
+    msg = ""
+    mitre_tactics = []
+    mitre_techniques = []
 
     scenario_type = random.choices(
         ["normal_traffic", "threat_intel_match", "ips_attack", "ssl_vpn", "denied_traffic"],
@@ -145,6 +154,9 @@ def generate_fortinet_event():
         level = "warning" if action == "login-failed" else "notice"
         event_id = "FG-VPN-SSL-0012"
         rem_ip = random.choice(BENIGN_INTERNET_IPS)
+        src_ip = rem_ip
+        dst_ip = "192.168.1.1"
+        dst_port = 10443
         msg = f"SSL VPN user {user} status: {action} from remote IP {rem_ip}"
         mitre_tactics = ["Credential Access"] if action == "login-failed" else []
         mitre_techniques = ["T1110"] if action == "login-failed" else []

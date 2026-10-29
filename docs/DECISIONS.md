@@ -81,9 +81,10 @@
 ## ADR-017: Real-Time Fortinet Log Simulator Service & Ingestion IP Extraction
 **Decision:**
 1. Enhanced `scripts/fortinet_firewall_simulator.py` with automatic target port detection (`8002`, `8001`, `3000`) and structured IP payload mapping (`source_ip`, `destination_ip`).
-2. Updated `api/services/ingestion.py` to prioritize `entry.source_ip` and `entry.destination_ip`, plus regex extraction from Fortinet key-value raw logs (`srcip=... dstip=...`).
-3. Created `src/app/api/logs/ingest/route.ts` to proxy ingestion from port 3000 to FastAPI backend.
-4. Launched continuous real-time background transmission of FortiGate 100F telemetry.
+2. Hardened event generation with top-level variable initialization (`dst_ip`, `dst_port`, `action`, `msg`), preventing `UnboundLocalError` across VPN and UTM scenarios.
+3. Updated `api/services/ingestion.py` to prioritize `entry.source_ip` and `entry.destination_ip`, plus regex extraction from Fortinet key-value raw logs (`srcip=... dstip=...`).
+4. Created `src/app/api/logs/ingest/route.ts` to proxy ingestion from port 3000 to FastAPI backend.
+5. Launched continuous real-time background transmission of FortiGate 100F telemetry.
 **Reason:**
 - User requested live streaming Fortinet logs into the SOC tool.
 - Log entries previously lacked populated `source_ip` and `destination_ip` columns in PostgreSQL because `process_log_entry` only parsed JSON sub-objects.
