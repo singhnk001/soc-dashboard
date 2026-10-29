@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, Bell, User, LogOut, Timer } from 'lucide-react';
+import { Search, Bell, User, LogOut, Timer, ZoomIn } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, KeyboardEvent } from 'react';
 import useSWR from 'swr';
@@ -39,14 +39,27 @@ export default function Header() {
 
   const [currentTime, setCurrentTime] = useState<string>('');
   const [role, setRole] = useState<string>('');
+  const [displayScale, setDisplayScale] = useState<string>('0.75');
+
+  const applyScale = (val: string) => {
+    setDisplayScale(val);
+    localStorage.setItem('soc_display_scale', val);
+    if (typeof document !== 'undefined') {
+      const num = parseFloat(val) || 0.75;
+      document.documentElement.style.setProperty('--app-scale', val);
+      if (document.body) {
+        (document.body.style as any).zoom = val;
+        document.body.style.width = `calc(100vw / ${num})`;
+        document.body.style.height = `calc(100vh / ${num})`;
+        document.body.style.minWidth = `calc(100vw / ${num})`;
+        document.body.style.minHeight = `calc(100vh / ${num})`;
+      }
+    }
+  };
 
   useEffect(() => {
-    try {
-      localStorage.removeItem('soc_display_scale');
-      if (typeof document !== 'undefined') {
-        (document.documentElement.style as any).zoom = '';
-      }
-    } catch {}
+    const saved = localStorage.getItem('soc_display_scale') || '0.75';
+    applyScale(saved);
   }, []);
 
   const handleLogout = () => {
@@ -131,6 +144,22 @@ export default function Header() {
       <h1 className="text-lg font-semibold text-[var(--text-primary)] select-none cursor-default">{getPageTitle()}</h1>
       
       <div className="flex items-center gap-4">
+        {/* Screen Ratio / Scale Selector */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--bg-hover)]/70 rounded-md text-xs text-[var(--text-secondary)] border border-[var(--border-color)]">
+          <ZoomIn size={13} className="text-blue-400 shrink-0" />
+          <span className="text-[11px] text-gray-400 hidden md:inline">Scale:</span>
+          <select
+            value={displayScale}
+            onChange={(e) => applyScale(e.target.value)}
+            className="bg-transparent text-xs text-[var(--text-primary)] outline-none cursor-pointer font-medium"
+            title="Dashboard Display Scale"
+          >
+            <option value="0.75" className="bg-[#111827] text-white">75% (Default)</option>
+            <option value="0.85" className="bg-[#111827] text-white">85%</option>
+            <option value="1" className="bg-[#111827] text-white">100%</option>
+          </select>
+        </div>
+
         <div className="flex items-center gap-2 px-2.5 py-1 bg-[var(--bg-hover)]/50 rounded-md text-xs font-mono text-[var(--text-secondary)] select-none cursor-default">
           <Timer size={13} className={timeLeft < 15 ? 'text-red-500 animate-pulse' : 'text-gray-500'} />
           <span className={timeLeft < 15 ? 'text-red-500' : ''}>

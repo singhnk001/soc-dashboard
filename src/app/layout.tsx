@@ -21,11 +21,32 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{localStorage.removeItem('soc_display_scale');if(document.documentElement){document.documentElement.style.zoom='';}}catch(e){}})();`,
+            __html: `(function(){
+              try {
+                var s = localStorage.getItem('soc_display_scale') || '0.75';
+                var n = parseFloat(s) || 0.75;
+                document.documentElement.style.setProperty('--app-scale', s);
+                if (document.documentElement) {
+                  document.documentElement.style.zoom = '';
+                }
+                var apply = function() {
+                  if (document.body) {
+                    document.body.style.zoom = s;
+                    document.body.style.width = 'calc(100vw / ' + n + ')';
+                    document.body.style.height = 'calc(100vh / ' + n + ')';
+                  }
+                };
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', apply);
+                } else {
+                  apply();
+                }
+              } catch(e) {}
+            })();`,
           }}
         />
       </head>
-      <body className={`${inter.className} flex h-screen w-full overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
+      <body className={`${inter.className} flex overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
         <Sidebar />
         <div className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
           <Header />
