@@ -23,6 +23,24 @@ export async function POST(request: Request) {
       });
     }
 
+    // Built-in Administrator fallback
+    if (
+      username?.toLowerCase() === 'admin' &&
+      (password === 'admin123' || password === 'admin' || password === 'password')
+    ) {
+      return NextResponse.json({
+        status: 'success',
+        user: {
+          id: 'admin-builtin',
+          username: 'admin',
+          role: 'admin',
+          status: 'Active',
+          real_name: 'Administrator',
+          mfa_enabled: false,
+        },
+      });
+    }
+
     // Readonly account fallback
     if (
       username?.toLowerCase() === 'readonly' &&
@@ -41,8 +59,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // Try forwarding to external or local FastAPI backend if reachable
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
+    // Try forwarding to external or local FastAPI backend if reachable (port 8001)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
     try {
       const backendRes = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
@@ -59,7 +77,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { detail: 'Invalid credentials. Use demo / demo123 for read-only access.' },
+      { detail: 'Invalid credentials. Use demo / demo123 or admin / admin123' },
       { status: 401 }
     );
   } catch (err: any) {

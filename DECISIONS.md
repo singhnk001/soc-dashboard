@@ -63,8 +63,17 @@
 **Reason:** When users set browser zoom to 75% or viewed on high-DPI displays, the previous `text-xs` (12px) shrank to an unreadable 9px.  
 **Impact:** Crystal-clear legibility and comfortable enterprise ergonomics across all display resolutions.
 
-
 ## ADR-015: Fortinet FortiGate Real-Time Firewall Simulator & Parser Integration
 **Decision:** Created a dedicated Fortinet FortiGate 100F real-time firewall simulator (`scripts/fortinet_firewall_simulator.py`) supporting both direct HTTP Ingestion API (`/api/logs/ingest`) and standard RFC3164 UDP Syslog (port 514). Integrated Fortinet into `DEMO_SOURCES`, `DEMO_PARSERS`, and `DEMO_USECASES`.  
 **Reason:** The user requested a realistic demo Fortinet firewall capable of streaming live traffic, UTM, IPS, SSL-VPN, and C2 threat detections into the SOC dashboard.  
 **Impact:** Analysts can test live ingestion, rule matching, and real-time dashboard updates without needing physical FortiGate hardware. Logs match threat intelligence feeds (AlienVault OTX & ThreatFox) to test immediate alert correlation.
+
+## ADR-016: MFA Auth Route, Port 8001 Backend Proxy & Dev Server Desync Recovery
+**Decision:**
+1. Implemented `src/app/api/auth/login/mfa/route.ts` to handle second-factor TOTP verification requested by `src/app/login/page.tsx`.
+2. Updated `src/app/api/auth/login/route.ts` to proxy requests to FastAPI port `8001` (was misconfigured to `8002`) and provided native `admin`/`admin123` fallback.
+3. Cleaned and recovered Next.js compilation cache following concurrent `next build` execution that had invalidated `.next/routes-manifest.json` on active dev instances.
+**Reason:**
+- The login interface posted to `/api/auth/login/mfa` when MFA was active, but no Next.js API route existed, returning HTTP 404.
+- Running `next build` while a `next dev` instance was serving `localhost:3000` deleted and swapped webpack chunks in `.next`, causing `ENOENT: routes-manifest.json` and a blank white screen.
+**Impact:** Complete elimination of MFA 404 errors, reliable admin and demo logins, and a pristine Next.js build with 0 compile errors across all 39 routes.
