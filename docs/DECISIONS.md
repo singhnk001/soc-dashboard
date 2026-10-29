@@ -62,3 +62,9 @@
 **Decision:** Expanded sidebar width from `w-60` (240px) to `w-64` (256px), increased navigation font size to `text-sm font-semibold` (14px), increased icon sizes to `size={19}`, and enhanced status footer contrast.  
 **Reason:** When users set browser zoom to 75% or viewed on high-DPI displays, the previous `text-xs` (12px) shrank to an unreadable 9px.  
 **Impact:** Crystal-clear legibility and comfortable enterprise ergonomics across all display resolutions.
+
+
+## ADR-015: Fortinet FortiGate Real-Time Firewall Simulator & Parser Integration
+**Decision:** Created a dedicated Fortinet FortiGate 100F real-time firewall simulator (`scripts/fortinet_firewall_simulator.py`) supporting both direct HTTP Ingestion API (`/api/logs/ingest`) and standard RFC3164 UDP Syslog (port 514). Integrated Fortinet into `DEMO_SOURCES`, `DEMO_PARSERS`, and `DEMO_USECASES`.  
+**Reason:** The user requested a realistic demo Fortinet firewall capable of streaming live traffic, UTM, IPS, SSL-VPN, and C2 threat detections into the SOC dashboard.  
+**Impact:** Analysts can test live ingestion, rule matching, and real-time dashboard updates without needing physical FortiGate hardware. Logs match threat intelligence feeds (AlienVault OTX & ThreatFox) to test immediate alert correlation.

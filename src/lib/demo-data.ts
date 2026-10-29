@@ -202,6 +202,22 @@ export const DEMO_SOURCES = [
     totalEvents: 18400,
     total_events: 18400,
   },
+  {
+    hostname: 'FG-100F-HQ-CORE',
+    ip_address: '192.168.1.254',
+    os_version: 'FortiOS v7.4.3 build2573',
+    status: 'healthy',
+    eps: 340,
+    events_per_second: 340,
+    lastSeen: new Date().toISOString(),
+    last_seen: new Date().toISOString(),
+    agent_version: 'FortiGate Syslog (CEF / Key-Value)',
+    source: 'Fortinet FortiGate (Traffic, UTM, IPS)',
+    protocol: 'UDP 514 / Syslog',
+    link_speed: '10 Gbps SFP+',
+    totalEvents: 142800,
+    total_events: 142800,
+  },
 ];
 
 export const DEMO_API_SOURCES = [
@@ -369,6 +385,14 @@ export const DEMO_PARSERS = [
     active: true,
     log_source: 'Nginx',
   },
+  {
+    id: 'p-fortinet-fortigate',
+    name: 'Fortinet FortiGate Key-Value Syslog Parser',
+    regex: 'date=(?<Date>\\S+)\\s+time=(?<Time>\\S+)\\s+devname="(?<DevName>[^"]+)"\\s+devid="(?<DevId>[^"]+)"\\s+type="?(?<LogType>\\w+)"?\\s+subtype="?(?<SubType>\\w+)"?\\s+level="?(?<Level>\\w+)"?.*?srcip=(?<SrcIp>[\\d.]+).*?dstip=(?<DstIp>[\\d.]+).*?srcport=(?<SrcPort>\\d+).*?dstport=(?<DstPort>\\d+).*?action="?(?<Action>\\w+)"?',
+    description: 'Parses FortiOS CEF/KV firewall logs into structured threat telemetry (src/dst IP, port, action, policy, service)',
+    active: true,
+    log_source: 'Fortinet-FortiGate',
+  },
 ];
 
 export const DEMO_USECASES = [
@@ -436,6 +460,17 @@ export const DEMO_USECASES = [
     mitre_technique: 'T1078',
     threshold_count: 2,
     severity: 'high',
+    active: true,
+  },
+  {
+    id: 'UC-FG01',
+    title: 'Fortinet: Critical IPS Attack Signature Blocked',
+    description: 'Alerts when FortiGate Intrusion Prevention System detects and blocks an exploit or C2 beaconing attempt.',
+    type: 'signature',
+    event_id: 'FG-IPS-ATTACK-0044',
+    mitre_technique: 'T1071',
+    threshold_count: 1,
+    severity: 'critical',
     active: true,
   },
 ];

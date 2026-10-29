@@ -14,6 +14,7 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 | Next.js Frontend | ✅ Live | Standard responsive layout, `h-screen w-full` |
 | VectorAgent (Windows Service) | ✅ Configured | Service context LocalSystem, batches Event IDs ≤20 |
 | Threat Intelligence Feeds | ✅ Active | AlienVault OTX, ThreatFox, URLhaus, CISA KEV, AbuseIPDB |
+| Fortinet FortiGate Simulator | ✅ Ready | `python scripts/fortinet_firewall_simulator.py --continuous` |
 | Demo & Role Access | ✅ Active | 1-Click Demo Login (`demo`/`demo123`), Admin Login (`admin`) |
 | Client Error Boundary | ✅ Active | `src/components/common/ErrorBoundary.tsx` wrapping main layout |
 
