@@ -254,7 +254,7 @@ export default function DashboardPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
+    <div className="p-4 md:p-5 space-y-4 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -378,7 +378,7 @@ export default function DashboardPage() {
 
       {/* ── KPI Row ─────────────────────────────────────────────────────────── */}
       {isVisible('kpi') && (
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           <div className="lg:col-span-1">
             <StatsCard
               title="Total Logs"
@@ -444,7 +444,7 @@ export default function DashboardPage() {
 
       {/* ── Severity + Top Sources ───────────────────────────────────────────── */}
       {(isVisible('severity') || isVisible('sources')) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {isVisible('severity') && <SeverityChart data={stats?.severity_distribution || []} />}
           {isVisible('sources')  && <TopSourcesChart data={stats?.top_sources || []} />}
         </div>
@@ -452,7 +452,7 @@ export default function DashboardPage() {
 
       {/* ── Top Events + MITRE Activity ──────────────────────────────────────── */}
       {(isVisible('events') || isVisible('mitre')) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {isVisible('events') && <TopEventsChart data={stats?.top_event_ids || []} />}
           {isVisible('mitre')  && <MitreActivityChart data={stats?.detected_techniques || []} />}
         </div>

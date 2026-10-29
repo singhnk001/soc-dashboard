@@ -16,6 +16,11 @@
   --accent-green: #22c55e;
 }
 
+/* High-density Enterprise SOC Dashboard scaling (75% default ratio) */
+html {
+  zoom: 0.75;
+}
+
 .light-theme {
   --bg-primary: #f3f4f6;
   --bg-secondary: #e5e7eb;
@@ -72,13 +77,13 @@ body {
 .soc-table th {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
-  padding: 12px;
+  padding: 10px 12px;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
 }
 
 .soc-table td {
-  padding: 12px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -100,15 +105,11 @@ button, a {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  border-radius: 0.375rem;
-  padding: 0.5rem 0.75rem;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
 }
 .input-field:focus {
-  outline: none;
   border-color: var(--accent-blue);
-}
-/* Ensure select options have dark backgrounds */
-select.input-field option {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
 }

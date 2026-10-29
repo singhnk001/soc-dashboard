@@ -32,7 +32,7 @@ export default function Sidebar() {
     return () => clearInterval(interval);
   }, []);
 
-    const navItems = [
+  const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Threat Intel', href: '/threat-intel', icon: ShieldAlert },
     { name: 'Sources', href: '/sources', icon: Server },
@@ -43,29 +43,29 @@ export default function Sidebar() {
     { name: 'Alerts', href: '/alerts', icon: Bell },
     { name: 'Playbooks', href: '/playbooks', icon: Zap },
     { name: 'Reference Sets', href: '/reference-sets', icon: Database },
-      { name: 'Settings', href: '/settings', icon: Settings },
-      { name: 'Troubleshooting', href: '/troubleshooting', icon: Activity },
+    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Troubleshooting', href: '/troubleshooting', icon: Activity },
   ];
 
   if (pathname === '/login') return null;
 
   return (
-    <aside className={`bg-[var(--bg-card)] border-r border-[#1f2937] flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
-      <div className="h-16 flex items-center justify-between px-4 border-b border-[#1f2937]">
+    <aside className={`bg-[var(--bg-card)] border-r border-[#1f2937] flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-60'} shrink-0`}>
+      <div className="h-14 flex items-center justify-between px-4 border-b border-[#1f2937]">
         {!collapsed && (
-          <div className="flex items-center gap-2 text-[var(--text-primary)] font-bold text-lg">
-            <Shield className="text-[var(--accent-blue)]" />
+          <div className="flex items-center gap-2 text-[var(--text-primary)] font-bold text-base">
+            <Shield className="text-[var(--accent-blue)]" size={20} />
             <span>SOC Dashboard</span>
           </div>
         )}
-        {collapsed && <Shield className="text-[var(--accent-blue)] mx-auto" />}
+        {collapsed && <Shield className="text-[var(--accent-blue)] mx-auto" size={20} />}
         <button onClick={() => setCollapsed(!collapsed)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] md:hidden">
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-4">
-        <nav className="space-y-1 px-2">
+      <div className="flex-1 overflow-y-auto py-3">
+        <nav className="space-y-0.5 px-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -73,13 +73,13 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                className={`flex items-center gap-3 px-3 py-1.5 rounded-md transition-colors text-xs font-medium ${
                   isActive 
                     ? 'bg-[var(--bg-secondary)] text-[var(--accent-blue)]' 
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
                 }`}
               >
-                <Icon size={20} />
+                <Icon size={16} />
                 {!collapsed && <span>{item.name}</span>}
               </Link>
             );
@@ -87,17 +87,17 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      <div className="p-4 pb-12 border-t border-[#1f2937] flex flex-col gap-2 select-none cursor-default">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-[var(--accent-green)]"></div>
-          {!collapsed && <span className="text-sm text-[var(--text-secondary)]">System Status: Online</span>}
+      <div className="p-3 pb-8 border-t border-[#1f2937] flex flex-col gap-1.5 select-none cursor-default">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+          <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span>System Status: Online</span>
         </div>
         {!collapsed && (
-          <div className="mt-2 text-xs text-gray-500 bg-[var(--bg-hover)]/30 p-2 rounded border border-[var(--border-color)]">
-            <div className="text-[var(--text-secondary)] font-medium truncate">{realName}</div>
-            <div className="flex justify-between mt-1">
+          <div className="flex flex-col text-[11px] text-gray-500">
+            <span className="truncate">{realName}</span>
+            <div className="flex justify-between items-center text-[10px] text-gray-600 font-mono mt-0.5">
               <span>Session:</span>
-              <span className="font-mono text-blue-400">{uptime}</span>
+              <span className="text-blue-400 font-medium">{uptime}</span>
             </div>
           </div>
         )}

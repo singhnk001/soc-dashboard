@@ -1,11 +1,10 @@
 'use client';
 
-import { Search, Bell, User, LogOut } from 'lucide-react';
+import { Search, Bell, User, LogOut, Timer, ZoomIn } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, KeyboardEvent } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
-import { Timer } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
@@ -18,7 +17,6 @@ export default function Header() {
     }
   }, [pathname, router]);
 
-  
   const isLoginPage = pathname === '/login';
 
   const fetcher = (url: string) => fetch(url).then(res => {
@@ -41,8 +39,23 @@ export default function Header() {
 
   const [currentTime, setCurrentTime] = useState<string>('');
   const [role, setRole] = useState<string>('');
-  
+  const [displayScale, setDisplayScale] = useState<string>('0.75');
 
+  useEffect(() => {
+    const saved = localStorage.getItem('soc_display_scale') || '0.75';
+    setDisplayScale(saved);
+    if (typeof document !== 'undefined') {
+      (document.documentElement.style as any).zoom = saved;
+    }
+  }, []);
+
+  const changeScale = (val: string) => {
+    setDisplayScale(val);
+    localStorage.setItem('soc_display_scale', val);
+    if (typeof document !== 'undefined') {
+      (document.documentElement.style as any).zoom = val;
+    }
+  };
 
   const handleLogout = () => {
     document.cookie = 'soc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
@@ -79,36 +92,35 @@ export default function Header() {
         setTimeLeft(newTimeout);
       }
     };
+
+    const handleCustomEvent = () => resetTimer();
+
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('idle_timeout_change', () => { setTimeLeft(parseInt(localStorage.getItem('soc_idle_timeout') || '30', 10) * 60); });
-    
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(e => document.addEventListener(e, resetTimer));
+    window.addEventListener('idle_timeout_change', handleCustomEvent);
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('keydown', resetTimer);
+    window.addEventListener('click', resetTimer);
 
     return () => {
       clearInterval(timer);
-      events.forEach(e => document.removeEventListener(e, resetTimer));
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('idle_timeout_change', handleCustomEvent);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('click', resetTimer);
     };
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setCurrentTime(now.toLocaleString());
+      setCurrentTime(now.toLocaleTimeString() + ' ' + now.toLocaleDateString());
     };
     
     updateTime();
     const interval = setInterval(updateTime, 1000);
     
-    // Simple cookie parser for session
-    const getCookie = (name: string) => {
-      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-      if (match) return decodeURIComponent(match[2]);
-      return null;
-    };
-    setRole(sessionStorage.getItem('soc_role') || 'ERROR_PLEASE_HARD_REFRESH_LOGIN_PAGE');
-    
+    setRole(sessionStorage.getItem('soc_role') || 'readonly');
 
     return () => clearInterval(interval);
   }, [pathname]);
@@ -119,30 +131,45 @@ export default function Header() {
     return name.charAt(0).toUpperCase() + name.slice(1);
   };
 
-
-
   // Hide header on login page
   if (pathname === '/login') return null;
 
   return (
-    <header className="h-16 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-6 shrink-0 relative z-10">
-      <h1 className="text-xl font-semibold text-[var(--text-primary)] select-none cursor-default">{getPageTitle()}</h1>
+    <header className="h-14 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-5 shrink-0 relative z-10">
+      <h1 className="text-lg font-semibold text-[var(--text-primary)] select-none cursor-default">{getPageTitle()}</h1>
       
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
+        {/* Scale/Density selector */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--bg-hover)]/70 rounded-md text-xs text-[var(--text-secondary)] border border-[var(--border-color)]">
+          <ZoomIn size={13} className="text-blue-400 shrink-0" />
+          <span className="text-[11px] text-gray-400 hidden md:inline">Scale:</span>
+          <select
+            value={displayScale}
+            onChange={(e) => changeScale(e.target.value)}
+            className="bg-transparent text-xs text-[var(--text-primary)] outline-none cursor-pointer font-medium"
+            title="Dashboard Display Scale"
+          >
+            <option value="0.67" className="bg-[#111827] text-white">67% (Compact)</option>
+            <option value="0.75" className="bg-[#111827] text-white">75% (Recommended)</option>
+            <option value="0.80" className="bg-[#111827] text-white">80%</option>
+            <option value="0.90" className="bg-[#111827] text-white">90%</option>
+            <option value="1" className="bg-[#111827] text-white">100%</option>
+          </select>
+        </div>
 
-
-        <div className="flex items-center gap-2 px-3 py-1 bg-[var(--bg-hover)]/50 rounded text-xs font-mono text-[var(--text-secondary)] select-none cursor-default">
-          <Timer size={14} className={timeLeft < 15 ? 'text-red-500 animate-pulse' : 'text-gray-500'} />
+        <div className="flex items-center gap-2 px-2.5 py-1 bg-[var(--bg-hover)]/50 rounded-md text-xs font-mono text-[var(--text-secondary)] select-none cursor-default">
+          <Timer size={13} className={timeLeft < 15 ? 'text-red-500 animate-pulse' : 'text-gray-500'} />
           <span className={timeLeft < 15 ? 'text-red-500' : ''}>
             {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
           </span>
         </div>
-        <div className="text-sm text-[var(--text-secondary)] hidden sm:block font-mono select-none cursor-default">
+
+        <div className="text-xs text-[var(--text-secondary)] hidden sm:block font-mono select-none cursor-default">
           {currentTime}
         </div>
 
-        <Link href="/alerts" className="relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-          <Bell size={20} />
+        <Link href="/alerts" className="relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-1">
+          <Bell size={18} />
           {newAlertsCount > 0 && (
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-[var(--text-primary)] flex items-center justify-center font-bold">
               {newAlertsCount}
@@ -150,22 +177,22 @@ export default function Header() {
           )}
         </Link>
 
-        <div className="flex items-center gap-3 border-l border-[var(--border-color)] pl-6">
+        <div className="flex items-center gap-3 border-l border-[var(--border-color)] pl-4">
           <div className="flex flex-col items-end hidden sm:flex select-none cursor-default">
-            <span className="text-sm font-medium text-[var(--text-primary)]">
+            <span className="text-xs font-medium text-[var(--text-primary)]">
               {role === 'admin' ? 'Administrator' : role === 'l3' ? 'L3 Analyst' : role === 'l2' ? 'L2 Analyst' : role === 'l1' ? 'L1 Analyst' : role === 'readonly' ? 'Read Only' : role}
             </span>
-            <span className="text-[10px] text-blue-400 font-mono uppercase bg-blue-500/10 px-1.5 rounded">{role} Access</span>
+            <span className="text-[9px] text-blue-400 font-mono uppercase bg-blue-500/10 px-1 rounded">{role} Access</span>
           </div>
-          <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 cursor-pointer">
-            <User size={18} />
+          <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 cursor-pointer">
+            <User size={16} />
           </div>
           <button 
             onClick={handleLogout}
-            className="ml-2 text-gray-500 hover:text-red-400 transition-colors p-2 rounded hover:bg-red-500/10"
+            className="text-gray-500 hover:text-red-400 transition-colors p-1.5 rounded hover:bg-red-500/10"
             title="Sign Out"
           >
-            <LogOut size={18} />
+            <LogOut size={16} />
           </button>
         </div>
       </div>
