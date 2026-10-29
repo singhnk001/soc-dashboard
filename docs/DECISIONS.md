@@ -193,3 +193,29 @@
 - Matching the Logs page Event Inspector standard provides tier-1/tier-2/tier-3 SOC analysts with an enterprise-grade investigation and case triage experience.
 **Impact:**
 - Streamlined alert triage workflow, reduced Mean Time to Triage (MTTT) and Mean Time to Respond (MTTR), eliminated eye strain with high-comfort dark slate theme, and enabled real analyst accountability with dynamic user assignments.
+
+
+## ADR-023: Enterprise Cryptographic Session Management & OWASP/NIST Hardening
+**Decision:**
+1. **Cryptographically Signed Session Tokens (`src/lib/auth-token.ts`)**:
+   - Replaced plain text role cookies (`document.cookie = "soc_session=admin"`) with cryptographically signed tokens minted via Web Crypto HMAC-SHA256 (`alg: HS256`).
+   - Token payload encapsulates `sub` (user ID), `username`, `role`, `real_name`, `iat` (issued at), and `exp` (expiration timestamp at 30 minutes / 1800s).
+   - Any client-side tampering of the payload or signature immediately triggers cryptographic verification rejection.
+2. **Server-Issued `HttpOnly`, `SameSite=Lax`, `Secure` Cookies**:
+   - Authentication routes (`src/app/api/auth/login/route.ts` and `src/app/api/auth/login/mfa/route.ts`) now issue the session cookie directly via HTTP response headers:
+     `Set-Cookie: soc_session=<signed_jwt>; Path=/; Max-Age=1800; HttpOnly; SameSite=lax; Secure`.
+   - Client-side JavaScript is strictly blocked from reading or writing the session cookie, eliminating XSS session theft vectors (OWASP ASVS 4.0 Section 3).
+3. **Cryptographic Edge Middleware Route Verification (`src/middleware.ts`)**:
+   - Next.js edge middleware parses and verifies the cryptographic HMAC signature of `soc_session` for every protected route.
+   - Forged or expired tokens (e.g. attempting to send `soc_session=admin`) are rejected with HTTP 307 redirect to `/login` and the invalid cookie is automatically wiped.
+4. **Dedicated Server Session Verification & Hydration (`src/app/api/auth/me/route.ts`)**:
+   - Added `GET /api/auth/me` route handler that verifies the HTTP-only cookie on the server.
+   - `src/components/Header.tsx` calls `/api/auth/me` on mount and navigation to securely hydrate UI state (`sessionStorage` is treated solely as a transient display cache for usernames/roles, never as an access control authority).
+5. **Server-Side Session Termination (`src/app/api/auth/logout/route.ts`)**:
+   - Added `POST /api/auth/logout` which expires and clears the `HttpOnly` cookie with `Max-Age=0`.
+   - Integrated with the 30-minute inactivity timer in `src/components/Header.tsx` to invalidate sessions on both client and server simultaneously.
+**Reason:**
+- Storing unverified plaintext roles (`soc_session=admin`) in `document.cookie` allowed trivial client-side privilege escalation (CWE-602) and violated OWASP ASVS and NIST SP 800-63B standards.
+- Reading cookies via JavaScript disabled `HttpOnly`, leaving sessions vulnerable to XSS exfiltration.
+**Impact:**
+- Full enterprise SOC compliance: zero client-side privilege tampering, protection against XSS session hijacking, automatic session expiration after 30 minutes, and complete server-side session authority.

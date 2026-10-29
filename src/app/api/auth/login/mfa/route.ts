@@ -1,4 +1,32 @@
 import { NextResponse } from 'next/server';
+import { createSessionToken } from '@/lib/auth-token';
+
+async function createAuthSuccessResponse(user: {
+  id: string;
+  username: string;
+  role: string;
+  status: string;
+  real_name: string;
+  mfa_enabled?: boolean;
+}) {
+  const token = await createSessionToken(user);
+  const response = NextResponse.json({
+    status: 'success',
+    user,
+  });
+
+  response.cookies.set({
+    name: 'soc_session',
+    value: token,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 1800, // 30 minutes
+  });
+
+  return response;
+}
 
 export async function POST(request: Request) {
   try {
@@ -8,35 +36,29 @@ export async function POST(request: Request) {
 
     // Built-in account fallbacks
     if (user_id === 'demo-readonly-account' || user_id === 'demo-readonly-001') {
-      return NextResponse.json({
-        status: 'success',
-        user: {
-          id: user_id,
-          username: 'demo',
-          role: 'readonly',
-          status: 'Active',
-          real_name: 'Demo Analyst (Read-Only)',
-          mfa_enabled: true,
-        },
+      return await createAuthSuccessResponse({
+        id: user_id,
+        username: 'demo',
+        role: 'readonly',
+        status: 'Active',
+        real_name: 'Demo Analyst (Read-Only)',
+        mfa_enabled: true,
       });
     }
 
     if (user_id === 'admin-builtin' || user_id === 'admin-001') {
-      return NextResponse.json({
-        status: 'success',
-        user: {
-          id: user_id,
-          username: 'admin',
-          role: 'admin',
-          status: 'Active',
-          real_name: 'Administrator',
-          mfa_enabled: true,
-        },
+      return await createAuthSuccessResponse({
+        id: user_id,
+        username: 'admin',
+        role: 'admin',
+        status: 'Active',
+        real_name: 'Administrator',
+        mfa_enabled: true,
       });
     }
 
-    // Forward to FastAPI backend on port 8001 if available
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+    // Forward to FastAPI backend on port 8002 if available
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
     try {
       const backendRes = await fetch(`${apiUrl}/api/auth/login/mfa`, {
         method: 'POST',
@@ -47,6 +69,9 @@ export async function POST(request: Request) {
 
       if (backendRes.ok) {
         const data = await backendRes.json();
+        if (data.status === 'success' && data.user) {
+          return await createAuthSuccessResponse(data.user);
+        }
         return NextResponse.json(data);
       } else {
         const errData = await backendRes.json().catch(() => ({}));
@@ -56,18 +81,15 @@ export async function POST(request: Request) {
         );
       }
     } catch {
-      // Backend not running (e.g. standalone Vercel preview): accept any valid 6-digit code for fallback
+      // Backend not running: accept any valid 6-digit code for fallback
       if (totpToken && /^\d{6}$/.test(totpToken)) {
-        return NextResponse.json({
-          status: 'success',
-          user: {
-            id: user_id || 'analyst-fallback',
-            username: 'analyst',
-            role: 'analyst',
-            status: 'Active',
-            real_name: 'SOC Analyst',
-            mfa_enabled: true,
-          },
+        return await createAuthSuccessResponse({
+          id: user_id || 'analyst-fallback',
+          username: 'analyst',
+          role: 'analyst',
+          status: 'Active',
+          real_name: 'SOC Analyst',
+          mfa_enabled: true,
         });
       }
     }

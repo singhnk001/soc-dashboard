@@ -16,7 +16,7 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 | Event Inspector Slide-Over | 🌟 Modernized | High-comfort dark slate theme, Network Flow visualizer, 3-tab layout, zero glare |
 | Threat Intel Alerts | 🚨 Automated | Real-time `[TI Match]` alerts generated on any malicious IP hit (ThreatFox, AlienVault, AbuseIPDB, CISA KEV) |
 | Threat Intel & Signatures | 🛡️ Bi-Directional | Explicit `Signature ID` (`FG-IPS-39812`), `Detected Threat Intel Feed`, and `Confidence %` evaluating **BOTH Source and Destination IPs** |
-| Authentication & MFA | ✅ Active | `/api/auth/login` (admin + demo + port 8002 proxy) & `/api/auth/login/mfa` |
+| Authentication & Session Mgmt | 🔐 Hardened (ADR-023) | Cryptographic HMAC-SHA256 session tokens, server-issued `HttpOnly`/`SameSite=Lax` cookies, Edge middleware signature checks, `/api/auth/me` validation |
 | Fortinet FortiGate Simulator | 🟢 Streaming | Continuous real-time background daemon (1-2 logs/sec) with enriched signature IDs and feeds |
 | Log Ingestion & Extraction | ✅ Fixed | `source_ip`, `destination_ip`, and `log_type: Firewall` properly classified |
 | Threat Intelligence Feeds | ✅ Active | AlienVault OTX, ThreatFox, URLhaus, CISA KEV, AbuseIPDB |
@@ -59,11 +59,12 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 - **Field Normalization:** `LogEntry` expects `source_ip` and `destination_ip`. The simulator emits both `source_ip`/`destination_ip` and `src_ip`/`dst_ip` for full backwards compatibility.
 - **Ingestion Proxy:** `src/app/api/logs/ingest/route.ts` forwards ingest calls from Next.js (port 3000) to FastAPI (port 8002).
 
-### Authentication & Sessions
-- **MFA Route:** Handled by `src/app/api/auth/login/mfa/route.ts`. Handles both local fallback (accepts 6-digit tokens or built-in users) and forwards to backend `http://127.0.0.1:8002/api/auth/login/mfa`.
-- **Admin & Demo Credentials:** `admin` (`admin123` or `admin`) and `demo` (`demo123` or `demo`) work standalone without backend database dependencies.
-- **Cookie vs SessionStorage:** The primary server-side session check is the `soc_session` HTTP cookie. `Header.tsx` checks this cookie on route change. Never delete the cookie if `sessionStorage` is merely unhydrated; always restore `sessionStorage` from the cookie.
-- **Inactivity Timeout:** Defaulted to 30 minutes (1,800s). Reset on every `pathname` change and user activity. Minimum clamp is 10 minutes.
+### Authentication & Sessions (ADR-023: Enterprise Hardened)
+- **Cryptographic Tokens (`auth-token.ts`):** All session tokens are minted with Web Crypto HMAC-SHA256 containing user ID, username, role, real name, and a 30-minute expiration (`exp`).
+- **Server-Issued `HttpOnly` Cookies:** Issued by `/api/auth/login` and `/api/auth/login/mfa` with `HttpOnly; SameSite=Lax; Path=/; Max-Age=1800`. Client JavaScript cannot read or alter this cookie, neutralizing XSS session theft.
+- **Edge Middleware Route Protection:** `src/middleware.ts` cryptographically validates every request. Any forged (e.g. `soc_session=admin`) or expired token is rejected with HTTP 307 redirect to `/login` and deleted.
+- **Server Session Validation (`/api/auth/me`):** `Header.tsx` validates the session directly against `/api/auth/me` on mount and route change. `sessionStorage` is treated purely as a transient UI cache for user profile rendering, never as an access control authority.
+- **Inactivity Timeout:** Defaulted to 30 minutes (1,800s). Inactivity expiry triggers `POST /api/auth/logout`, wiping the `HttpOnly` cookie on the server and cleaning client cache.
 
 ---
 

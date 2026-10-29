@@ -1,4 +1,33 @@
 import { NextResponse } from 'next/server';
+import { createSessionToken } from '@/lib/auth-token';
+
+async function createAuthSuccessResponse(user: {
+  id: string;
+  username: string;
+  role: string;
+  status: string;
+  real_name: string;
+  mfa_enabled?: boolean;
+}) {
+  const token = await createSessionToken(user);
+  const response = NextResponse.json({
+    status: 'success',
+    user,
+  });
+
+  // Set enterprise HttpOnly, SameSite=Lax, Secure session cookie (OWASP ASVS compliant)
+  response.cookies.set({
+    name: 'soc_session',
+    value: token,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 1800, // 30 minutes
+  });
+
+  return response;
+}
 
 export async function POST(request: Request) {
   try {
@@ -10,16 +39,13 @@ export async function POST(request: Request) {
       username?.toLowerCase() === 'demo' &&
       (password === 'demo123' || password === 'demo')
     ) {
-      return NextResponse.json({
-        status: 'success',
-        user: {
-          id: 'demo-readonly-account',
-          username: 'demo',
-          role: 'readonly',
-          status: 'Active',
-          real_name: 'Demo Analyst (Read-Only)',
-          mfa_enabled: false,
-        },
+      return await createAuthSuccessResponse({
+        id: 'demo-readonly-account',
+        username: 'demo',
+        role: 'readonly',
+        status: 'Active',
+        real_name: 'Demo Analyst (Read-Only)',
+        mfa_enabled: false,
       });
     }
 
@@ -28,16 +54,13 @@ export async function POST(request: Request) {
       username?.toLowerCase() === 'admin' &&
       (password === 'admin123' || password === 'admin' || password === 'password')
     ) {
-      return NextResponse.json({
-        status: 'success',
-        user: {
-          id: 'admin-builtin',
-          username: 'admin',
-          role: 'admin',
-          status: 'Active',
-          real_name: 'Administrator',
-          mfa_enabled: false,
-        },
+      return await createAuthSuccessResponse({
+        id: 'admin-builtin',
+        username: 'admin',
+        role: 'admin',
+        status: 'Active',
+        real_name: 'Administrator',
+        mfa_enabled: false,
       });
     }
 
@@ -46,21 +69,18 @@ export async function POST(request: Request) {
       username?.toLowerCase() === 'readonly' &&
       (password === 'readonly@123' || password === 'readonly')
     ) {
-      return NextResponse.json({
-        status: 'success',
-        user: {
-          id: 'readonly-002',
-          username: 'readonly',
-          role: 'readonly',
-          status: 'Active',
-          real_name: 'Read Only User',
-          mfa_enabled: false,
-        },
+      return await createAuthSuccessResponse({
+        id: 'readonly-002',
+        username: 'readonly',
+        role: 'readonly',
+        status: 'Active',
+        real_name: 'Read Only User',
+        mfa_enabled: false,
       });
     }
 
-    // Try forwarding to external or local FastAPI backend if reachable (port 8001)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+    // Forward to FastAPI backend on port 8002
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
     try {
       const backendRes = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
@@ -68,12 +88,16 @@ export async function POST(request: Request) {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(3000),
       });
+
       if (backendRes.ok) {
         const data = await backendRes.json();
+        if (data.status === 'success' && data.user) {
+          return await createAuthSuccessResponse(data.user);
+        }
         return NextResponse.json(data);
       }
     } catch {
-      // Backend not running (e.g. standalone Vercel preview)
+      // Backend unreachable (e.g. standalone preview)
     }
 
     return NextResponse.json(

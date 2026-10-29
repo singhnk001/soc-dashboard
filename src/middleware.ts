@@ -1,17 +1,29 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifySessionToken } from '@/lib/auth-token';
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get('soc_session');
-  
-  if (!session && !request.nextUrl.pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/login', request.url));
+export async function middleware(request: NextRequest) {
+  const sessionCookie = request.cookies.get('soc_session')?.value;
+  const verification = await verifySessionToken(sessionCookie);
+  const isAuthenticated = verification.valid;
+  const isLoginPage = request.nextUrl.pathname.startsWith('/login');
+
+  // If unauthenticated and trying to access protected route -> redirect to /login
+  if (!isAuthenticated && !isLoginPage) {
+    const redirectUrl = new URL('/login', request.url);
+    const response = NextResponse.redirect(redirectUrl);
+    if (sessionCookie) {
+      // Clear invalid / expired / forged cookie
+      response.cookies.delete('soc_session');
+    }
+    return response;
   }
-  
-  if (session && request.nextUrl.pathname.startsWith('/login')) {
+
+  // If authenticated and trying to access /login -> redirect to home /
+  if (isAuthenticated && isLoginPage) {
     return NextResponse.redirect(new URL('/', request.url));
   }
-  
+
   return NextResponse.next();
 }
 

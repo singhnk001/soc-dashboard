@@ -24,24 +24,31 @@ export default function LoginPage() {
     sessionStorage.removeItem("soc_real_name");
   }, []);
 
-  const handleDemoLogin = () => {
+  const handleDemoLogin = async () => {
     setIsLoading(true);
     setError('');
-    const demoUser = {
-      id: 'demo-readonly-001',
-      username: 'demo',
-      real_name: 'Demo Analyst (Read-Only)',
-      role: 'readonly',
-      status: 'Active',
-      mfa_enabled: false,
-    };
-    sessionStorage.setItem('user', JSON.stringify(demoUser));
-    sessionStorage.setItem('soc_user', demoUser.username);
-    sessionStorage.setItem('soc_real_name', demoUser.real_name);
-    sessionStorage.setItem('soc_role', demoUser.role);
-    sessionStorage.setItem('soc_login_time', Date.now().toString());
-    document.cookie = `soc_session=${demoUser.role}; path=/`;
-    router.push('/');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'demo', password: 'demo123' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        sessionStorage.setItem('user', JSON.stringify(data.user));
+        sessionStorage.setItem('soc_user', data.user.username);
+        sessionStorage.setItem('soc_real_name', data.user.real_name);
+        sessionStorage.setItem('soc_role', data.user.role);
+        sessionStorage.setItem('soc_login_time', Date.now().toString());
+        router.push('/');
+      } else {
+        setError(data.detail || 'Demo login failed');
+      }
+    } catch {
+      setError('Server unreachable. Please check connection.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -54,7 +61,7 @@ export default function LoginPage() {
       username.trim().toLowerCase() === 'demo' &&
       (password === 'demo123' || password === 'demo')
     ) {
-      handleDemoLogin();
+      await handleDemoLogin();
       return;
     }
 
@@ -75,7 +82,6 @@ export default function LoginPage() {
           sessionStorage.setItem('soc_real_name', data.user.real_name);
           sessionStorage.setItem('soc_role', data.user.role);
           sessionStorage.setItem('soc_login_time', Date.now().toString());
-          document.cookie = `soc_session=${data.user.role}; path=/`;
           router.push('/');
         } else {
           setError(data.detail || 'Invalid verification code');
@@ -100,7 +106,6 @@ export default function LoginPage() {
             sessionStorage.setItem('soc_real_name', data.user.real_name);
             sessionStorage.setItem('soc_role', data.user.role);
             sessionStorage.setItem('soc_login_time', Date.now().toString());
-            document.cookie = `soc_session=${data.user.role}; path=/`;
             router.push('/');
           }
         } else {

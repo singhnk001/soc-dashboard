@@ -6,18 +6,18 @@ This document provides exact step-by-step instructions to roll back changes made
 
 ## 1. Quick Git Rollback Checkpoints
 
-### Current Checkpoint (ADR-022: Industry-Standard SOC Alerts Triage Workspace & Analyst Assignment Redesign)
+### Current Checkpoint (ADR-023: Enterprise Cryptographic Session Management & OWASP/NIST Hardening)
 - **Commit:** Latest on `main`
 - **Features:** 
-  - Complete redesign of `src/app/alerts/page.tsx` with high-visibility dark slate theme (`#0a0f1d`, `#0c1220`, `#0e1626`).
-  - Dynamic SIEM analyst user assignment dropdown fetching real users from `/api/users`.
-  - 1-Click "Assign to Me" button and table row "+ Assign Analyst" fast triage selector.
-  - Telemetry flow preview in table rows (`Source IP:port ➔ Target IP:port` + Action badge).
-  - Bulk actions toolbar for batch assignment and multi-incident resolution.
-  - Incident investigation slide-over inspector with connection flow, threat correlation (Signature ID, Attack Name, Feed attribution, Confidence score), and 4 tabs (Overview & Fields with search, Tags, Raw Log, Timeline & Notes).
-  - Backend API enhancements in `api/routers/alerts.py` (`search`, `assigned_to`, and `POST /api/alerts/bulk`).
+  - Cryptographically signed session tokens (`src/lib/auth-token.ts`) using Web Crypto HMAC-SHA256 (`alg: HS256`).
+  - Server-issued `HttpOnly; SameSite=Lax; Path=/; Max-Age=1800` cookies on `/api/auth/login` and `/api/auth/login/mfa`.
+  - Next.js Edge Middleware route verification (`src/middleware.ts`) enforcing cryptographic token validity on all protected routes.
+  - Dedicated `/api/auth/me` endpoint for secure session hydration and verification.
+  - Dedicated `/api/auth/logout` endpoint for clean server-side cookie invalidation.
+  - Complete elimination of plaintext client-side `document.cookie = soc_session=...` assignments and privilege escalation vectors.
 
 ### Previous Checkpoints:
+- **`f3ac383`:** Industry-Standard SOC Alerts Triage Workspace & Analyst Assignment Redesign (ADR-022).
 - **`1596762`:** Automated Threat Intelligence Alert Generation & Timestamp Cast Hardening (ADR-021).
 - **`21cc580`:** Bi-directional (Source & Destination IP) TI correlation (ADR-020).
 - **`84775ac`:** Explicit Signature ID & Detected Threat Intel Feed Attribution (ADR-019).

@@ -11,32 +11,40 @@ export default function Header() {
   const router = useRouter();
   const isLoginPage = pathname === '/login';
 
-  // Session validation: Never log out if cookie is present
+  // Server-side session validation and hydration (OWASP ASVS compliant)
   useEffect(() => {
     if (pathname === '/login') return;
 
-    if (typeof window !== 'undefined') {
-      const hasCookie = document.cookie.includes('soc_session=');
-      const sessionUser = sessionStorage.getItem('soc_user');
+    let isMounted = true;
+    const validateSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (!isMounted) return;
 
-      if (hasCookie && !sessionUser) {
-        const match = document.cookie.match(/soc_session=([^;]+)/);
-        const userRole = match ? match[1].trim() : 'readonly';
-        const defaultUser = userRole === 'admin' ? 'admin' : 'demo';
-        sessionStorage.setItem('soc_user', defaultUser);
-        sessionStorage.setItem('soc_role', userRole);
-        sessionStorage.setItem(
-          'soc_real_name',
-          defaultUser === 'admin' ? 'Lead SOC Administrator' : 'Demo SOC Analyst'
-        );
-        setRole(userRole);
-        return;
-      }
-
-      if (!hasCookie && !sessionUser) {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.user) {
+            sessionStorage.setItem('soc_user', data.user.username);
+            sessionStorage.setItem('soc_real_name', data.user.real_name || data.user.username);
+            sessionStorage.setItem('soc_role', data.user.role);
+            sessionStorage.setItem('user', JSON.stringify(data.user));
+            setRole(data.user.role);
+            return;
+          }
+        }
+        // If unauthenticated or token expired, redirect to login
+        sessionStorage.removeItem('soc_user');
+        sessionStorage.removeItem('soc_real_name');
+        sessionStorage.removeItem('soc_role');
+        sessionStorage.removeItem('user');
         router.push('/login');
+      } catch {
+        // Network failure fallback — do not immediately kick out if local storage has session
       }
-    }
+    };
+
+    validateSession();
+    return () => { isMounted = false; };
   }, [pathname, router]);
 
   const fetcher = (url: string) =>
@@ -69,8 +77,10 @@ export default function Header() {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [role, setRole] = useState<string>('');
 
-  const handleLogout = () => {
-    document.cookie = 'soc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {}
     sessionStorage.removeItem('soc_user');
     sessionStorage.removeItem('soc_real_name');
     sessionStorage.removeItem('soc_role');
