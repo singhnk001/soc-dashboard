@@ -20,8 +20,8 @@ PRIVATE_IP_RE = re.compile(
 def process_log_entry(entry: LogEntry, conn, active_parsers: list, active_usecases: list) -> str:
     """Core logic to parse, enrich, match IOCs, evaluate detection rules, and persist a log entry."""
     cursor = conn.cursor()
-    src_ip = None
-    dest_ip = None
+    src_ip = entry.source_ip or None
+    dest_ip = entry.destination_ip or None
 
     # Pull src_ip/dest_ip from structured extracted_fields in raw_log if present
     raw_obj = None
@@ -33,17 +33,25 @@ def process_log_entry(entry: LogEntry, conn, active_parsers: list, active_usecas
             
     if raw_obj:
         ef = raw_obj.get("extracted_fields", {})
-        src_ip = ef.get("src_ip") or None
-        dest_ip = ef.get("dest_ip") or None
+        src_ip = src_ip or ef.get("src_ip") or None
+        dest_ip = dest_ip or ef.get("dest_ip") or None
 
-    # Fallback: regex search on message text
+    # Fallback: regex search on message text or raw_log
     if not src_ip:
-        src_match = re.search(r'Source Network Address:\s*([\d\.]+)', entry.message) or re.search(r'src_ip=([\d\.]+)', entry.message)
+        src_match = (
+            re.search(r'Source Network Address:\s*([\d\.]+)', entry.message)
+            or re.search(r'src_?ip[=:]\s*"?([\d\.]+)', entry.raw_log or '')
+            or re.search(r'src_?ip[=:]\s*"?([\d\.]+)', entry.message)
+        )
         if src_match:
             src_ip = src_match.group(1)
 
     if not dest_ip:
-        dest_match = re.search(r'Dest(?:ination)? Network Address:\s*([\d\.]+)', entry.message) or re.search(r'dest_ip=([\d\.]+)', entry.message)
+        dest_match = (
+            re.search(r'Dest(?:ination)? Network Address:\s*([\d\.]+)', entry.message)
+            or re.search(r'dst_?ip[=:]\s*"?([\d\.]+)', entry.raw_log or '')
+            or re.search(r'dst_?ip[=:]\s*"?([\d\.]+)', entry.message)
+        )
         if dest_match:
             dest_ip = dest_match.group(1)
 
@@ -53,7 +61,7 @@ def process_log_entry(entry: LogEntry, conn, active_parsers: list, active_usecas
         ips = [ip for ip in ips if ip not in ('127.0.0.1', '0.0.0.0', '255.255.255.255')]
         if ips:
             src_ip = ips[0]
-            if len(ips) > 1:
+            if len(ips) > 1 and not dest_ip:
                 dest_ip = ips[1]
 
     log_id = str(uuid.uuid4())

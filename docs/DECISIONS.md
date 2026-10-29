@@ -77,3 +77,15 @@
 - The login interface posted to `/api/auth/login/mfa` when MFA was active, but no Next.js API route existed, returning HTTP 404.
 - Running `next build` while a `next dev` instance was serving `localhost:3000` deleted and swapped webpack chunks in `.next`, causing `ENOENT: routes-manifest.json` and a blank white screen.
 **Impact:** Complete elimination of MFA 404 errors, reliable admin and demo logins, and a pristine Next.js build with 0 compile errors across all 39 routes.
+
+## ADR-017: Real-Time Fortinet Log Simulator Service & Ingestion IP Extraction
+**Decision:**
+1. Enhanced `scripts/fortinet_firewall_simulator.py` with automatic target port detection (`8002`, `8001`, `3000`) and structured IP payload mapping (`source_ip`, `destination_ip`).
+2. Updated `api/services/ingestion.py` to prioritize `entry.source_ip` and `entry.destination_ip`, plus regex extraction from Fortinet key-value raw logs (`srcip=... dstip=...`).
+3. Created `src/app/api/logs/ingest/route.ts` to proxy ingestion from port 3000 to FastAPI backend.
+4. Launched continuous real-time background transmission of FortiGate 100F telemetry.
+**Reason:**
+- User requested live streaming Fortinet logs into the SOC tool.
+- Log entries previously lacked populated `source_ip` and `destination_ip` columns in PostgreSQL because `process_log_entry` only parsed JSON sub-objects.
+**Impact:**
+- Full-fidelity Fortinet telemetry streams live into the SOC Log Explorer, Dashboard charts, and alert correlation pipelines with complete IP and MITRE visibility.

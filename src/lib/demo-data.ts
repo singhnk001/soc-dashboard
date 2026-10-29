@@ -4,8 +4,11 @@
  */
 
 export function shouldProxy(): boolean {
-  const url = process.env.NEXT_PUBLIC_API_URL;
-  return Boolean(url && !url.includes('127.0.0.1') && !url.includes('localhost'));
+  if (process.env.VERCEL) {
+    const url = process.env.NEXT_PUBLIC_API_URL;
+    return Boolean(url && !url.includes('127.0.0.1') && !url.includes('localhost'));
+  }
+  return true;
 }
 
 export const DEMO_SYSTEM_HEALTH = {

@@ -207,6 +207,8 @@ def generate_fortinet_event():
         "hostname": DEV_NAME,
         "message": msg,
         "raw_log": raw_msg,
+        "source_ip": src_ip,
+        "destination_ip": dst_ip,
         "src_ip": src_ip,
         "dst_ip": dst_ip,
         "src_port": src_port,
@@ -246,6 +248,17 @@ def send_via_syslog(host: str, port: int, raw_msg: str, sock: socket.socket) -> 
     except Exception:
         return False
 
+def auto_detect_api() -> str:
+    for target in ["http://localhost:8002", "http://127.0.0.1:8002", "http://localhost:8001", "http://127.0.0.1:8001", "http://localhost:3000"]:
+        try:
+            req = urllib.request.Request(f"{target}/api/stats", headers={"User-Agent": "Probe"})
+            with urllib.request.urlopen(req, timeout=1) as resp:
+                if resp.status == 200:
+                    return target
+        except Exception:
+            pass
+    return "http://localhost:8002"
+
 # ---------------------------------------------------------------------------
 # Main Runner
 # ---------------------------------------------------------------------------
@@ -254,7 +267,7 @@ def main():
         description="Fortinet FortiGate Real-Time Firewall Simulator for SOC Dashboard"
     )
     parser.add_argument("--mode", choices=["http", "syslog"], default="http", help="Transmission mode: http API or UDP syslog (default: http)")
-    parser.add_argument("--api", default="http://localhost:8001", help="SOC Dashboard API URL (default: http://localhost:8001)")
+    parser.add_argument("--api", default="auto", help="SOC Dashboard API URL (default: auto-detect 8002/8001/3000)")
     parser.add_argument("--syslog-host", default="127.0.0.1", help="Syslog listener host (default: 127.0.0.1)")
     parser.add_argument("--syslog-port", type=int, default=514, help="Syslog UDP port (default: 514)")
     parser.add_argument("--rate", type=float, default=2.0, help="Logs per second to generate (default: 2.0)")
@@ -262,12 +275,14 @@ def main():
     parser.add_argument("--continuous", action="store_true", help="Run indefinitely in real-time until Ctrl+C")
     args = parser.parse_args()
 
+    api_url = auto_detect_api() if args.api == "auto" else args.api
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) if args.mode == "syslog" else None
 
     print("=" * 72)
     print(" 🛡️  FORTINET FORTIGATE REAL-TIME FIREWALL SIMULATOR (FortiOS v7.4.x)")
     print(f" • Device:    {DEV_NAME} ({DEV_ID})")
-    print(f" • Mode:      {args.mode.upper()} -> {'API ' + args.api if args.mode == 'http' else f'UDP {args.syslog_host}:{args.syslog_port}'}")
+    print(f" • Mode:      {args.mode.upper()} -> {'API ' + api_url if args.mode == 'http' else f'UDP {args.syslog_host}:{args.syslog_port}'}")
     print(f" • Rate:      {args.rate} logs/second (Interval: {1.0/args.rate:.2f}s)")
     print(f" • Mode:      {'CONTINUOUS REAL-TIME (Ctrl+C to stop)' if args.continuous or args.count == 0 else f'Batch of {args.count} logs'}")
     print("=" * 72)
@@ -286,7 +301,7 @@ def main():
                 threats_detected += 1
 
             if args.mode == "http":
-                ok = send_via_http(args.api, event)
+                ok = send_via_http(api_url, event)
             else:
                 ok = send_via_syslog(args.syslog_host, args.syslog_port, event["raw_log"], sock)
 
