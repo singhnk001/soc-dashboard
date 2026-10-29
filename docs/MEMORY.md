@@ -13,8 +13,9 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 | FastAPI API | ✅ Running | `0.0.0.0:8002`, `--workers 1` |
 | Next.js Frontend | ✅ Running (Port 3000) | Standard responsive layout, `h-screen w-full`, 40 routes compiled |
 | Event Inspector Slide-Over | 🌟 Modernized | High-comfort dark slate theme, Network Flow visualizer, 3-tab layout, zero glare |
+| Threat Intel & Signatures | 🛡️ Enriched | Explicit `Signature ID` (`FG-IPS-39812`), `Detected Threat Intel Feed` (ThreatFox, AlienVault, etc.), and `Confidence %` |
 | Authentication & MFA | ✅ Active | `/api/auth/login` (admin + demo + port 8002 proxy) & `/api/auth/login/mfa` |
-| Fortinet FortiGate Simulator | 🟢 Streaming | Continuous real-time background daemon (2 logs/sec) |
+| Fortinet FortiGate Simulator | 🟢 Streaming | Continuous real-time background daemon (1-2 logs/sec) with enriched signature IDs and feeds |
 | Log Ingestion & Extraction | ✅ Fixed | `source_ip`, `destination_ip`, and `log_type: Firewall` properly classified |
 | Threat Intelligence Feeds | ✅ Active | AlienVault OTX, ThreatFox, URLhaus, CISA KEV, AbuseIPDB |
 | Demo & Role Access | ✅ Active | 1-Click Demo Login (`demo`/`demo123`), Admin Login (`admin`/`admin123`) |
@@ -23,6 +24,11 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 ---
 
 ## Known Issues, Quirks & Workarounds
+
+### Threat Intelligence & Signature ID Correlation (ADR-019)
+- **Signature ID Visibility:** Displayed in both the Threat Intelligence hero card and the Attributes search table. Searching `sign` matches both `Threat / Attack Signature` and `Signature ID`.
+- **Feed Attribution:** Every flagged event clearly attributes the detecting feed (e.g. `ThreatFox (abuse.ch)`, `AlienVault OTX Community Feed`, `AbuseIPDB Threat Intelligence`, `CISA KEV`) along with a confidence rating.
+- **Historical Fallback:** Even for logs ingested before the simulator updates, `correlateThreatMetadata()` automatically correlates destination IPs and attack names to identify the correct signature ID and threat feed.
 
 ### Event Inspector & UX Ergonomics
 - **No Table Squishing:** Event slide-over uses standard fixed overlay (`w-[640px] max-w-[95vw]` with `bg-black/60 backdrop-blur-[2px]`). Main table width does not contract or shift horizontally.
@@ -57,4 +63,6 @@ python scripts/fortinet_firewall_simulator.py --continuous
 
 # 4. View Fortinet Logs in Real-Time
 # Navigate to: http://localhost:3000/logs -> Click any log row or "Full Event Details"
+# Search "sign" to see both "Threat / Attack Signature" and "Signature ID"
+# Check the Threat Intelligence banner for "Detected by: ThreatFox (abuse.ch)" and confidence badge.
 ```

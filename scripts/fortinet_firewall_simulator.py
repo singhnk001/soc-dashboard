@@ -44,14 +44,68 @@ INTERNAL_SUBNETS = [
     "192.168.1.", "192.168.10.", "10.0.0.", "10.0.1.", "172.16.50."
 ]
 
-# Threat Intelligence Watchlist (aligned with ThreatFox & AlienVault OTX feeds)
+# Threat Intelligence Watchlist (aligned with ThreatFox, AlienVault OTX, AbuseIPDB feeds)
 MALICIOUS_C2_IPS = [
-    {"ip": "185.220.101.5",  "threat": "Cobalt Strike C2 Beacon", "country": "RU", "severity": "critical"},
-    {"ip": "194.26.29.112",  "threat": "Emotet Botnet Dropper",   "country": "NL", "severity": "critical"},
-    {"ip": "45.154.255.88",  "threat": "QakBot Loader Infrastructure", "country": "US", "severity": "high"},
-    {"ip": "109.236.87.14",  "threat": "LockBit Ransomware Exfiltration Host", "country": "RU", "severity": "critical"},
-    {"ip": "91.240.118.230", "threat": "AsyncRAT Reverse Shell Listener", "country": "UA", "severity": "high"},
-    {"ip": "185.130.5.231",  "threat": "Mirai Scanner / Brute-force", "country": "DE", "severity": "medium"},
+    {
+        "ip": "185.220.101.5",
+        "threat": "Cobalt Strike C2 Beacon",
+        "country": "RU",
+        "severity": "critical",
+        "sig_id": "FG-IPS-41025",
+        "attack_id": "41025",
+        "feed": "ThreatFox (abuse.ch)",
+        "confidence": 100
+    },
+    {
+        "ip": "194.26.29.112",
+        "threat": "Emotet Botnet Dropper",
+        "country": "NL",
+        "severity": "critical",
+        "sig_id": "FG-IPS-39812",
+        "attack_id": "39812",
+        "feed": "ThreatFox (abuse.ch)",
+        "confidence": 98
+    },
+    {
+        "ip": "45.154.255.88",
+        "threat": "QakBot Loader Infrastructure",
+        "country": "US",
+        "severity": "high",
+        "sig_id": "FG-IPS-52140",
+        "attack_id": "52140",
+        "feed": "AbuseIPDB Threat Intelligence",
+        "confidence": 95
+    },
+    {
+        "ip": "109.236.87.14",
+        "threat": "LockBit Ransomware Exfiltration Host",
+        "country": "RU",
+        "severity": "critical",
+        "sig_id": "FG-IPS-47910",
+        "attack_id": "47910",
+        "feed": "AlienVault OTX Community Feed",
+        "confidence": 99
+    },
+    {
+        "ip": "91.240.118.230",
+        "threat": "AsyncRAT Reverse Shell Listener",
+        "country": "UA",
+        "severity": "high",
+        "sig_id": "FG-IPS-31045",
+        "attack_id": "31045",
+        "feed": "AlienVault OTX Community Feed",
+        "confidence": 96
+    },
+    {
+        "ip": "185.130.5.231",
+        "threat": "Mirai Scanner / Brute-force",
+        "country": "DE",
+        "severity": "medium",
+        "sig_id": "FG-IPS-22891",
+        "attack_id": "22891",
+        "feed": "AbuseIPDB Blacklist",
+        "confidence": 90
+    },
 ]
 
 BENIGN_INTERNET_IPS = [
@@ -71,13 +125,13 @@ SERVICES = {
 }
 
 IPS_ATTACK_SIGNATURES = [
-    ("FortiGuard: Apache.Log4j.JNDI.Remote.Code.Execution", "T1190", "critical"),
-    ("FortiGuard: MS.Windows.SMBv1.Remote.Code.Execution.EternalBlue", "T1210", "critical"),
-    ("FortiGuard: OpenSSL.Heartbleed.Information.Disclosure", "T1595", "high"),
-    ("FortiGuard: Fortinet.FortiOS.SSL-VPN.Heap.Buffer.Overflow.CVE-2023-27997", "T1190", "critical"),
-    ("FortiGuard: Cobalt.Strike.DNS.Beaconing.Activity", "T1071.004", "critical"),
-    ("FortiGuard: SSH.Brute.Force.Login.Attempt", "T1110.001", "medium"),
-    ("FortiGuard: Suspicious.PowerShell.Outbound.Connection", "T1059.001", "high"),
+    ("FortiGuard: Apache.Log4j.JNDI.Remote.Code.Execution", "T1190", "critical", "FG-IPS-41051", "41051", "CISA KEV (CVE-2021-44228)", 100),
+    ("FortiGuard: MS.Windows.SMBv1.Remote.Code.Execution.EternalBlue", "T1210", "critical", "FG-IPS-38012", "38012", "FortiGuard Core IPS", 100),
+    ("FortiGuard: OpenSSL.Heartbleed.Information.Disclosure", "T1595", "high", "FG-IPS-29104", "29104", "FortiGuard Core IPS (CVE-2014-0160)", 99),
+    ("FortiGuard: Fortinet.FortiOS.SSL-VPN.Heap.Buffer.Overflow.CVE-2023-27997", "T1190", "critical", "FG-IPS-52997", "52997", "CISA KEV / Fortinet PSIRT", 100),
+    ("FortiGuard: Cobalt.Strike.DNS.Beaconing.Activity", "T1071.004", "critical", "FG-IPS-49102", "49102", "ThreatFox (abuse.ch)", 98),
+    ("FortiGuard: SSH.Brute.Force.Login.Attempt", "T1110.001", "medium", "FG-IPS-18230", "18230", "AbuseIPDB Threat Intelligence", 92),
+    ("FortiGuard: Suspicious.PowerShell.Outbound.Connection", "T1059.001", "high", "FG-IPS-33401", "33401", "FortiGuard Behavioral Engine", 94),
 ]
 
 # ---------------------------------------------------------------------------
@@ -107,6 +161,12 @@ def generate_fortinet_event():
         weights=[0.60, 0.12, 0.10, 0.08, 0.10]
     )[0]
 
+    sig_id = ""
+    attack_id = ""
+    threat_feed = ""
+    threat_confidence = 0
+    threat_name = ""
+
     if scenario_type == "threat_intel_match":
         ioc = random.choice(MALICIOUS_C2_IPS)
         dst_ip = ioc["ip"]
@@ -114,7 +174,12 @@ def generate_fortinet_event():
         action = "deny"
         level = "alert"
         severity = ioc["severity"]
-        event_id = "FG-UTM-C2-BLOCKED"
+        sig_id = ioc.get("sig_id", "FG-IPS-39812")
+        attack_id = ioc.get("attack_id", "39812")
+        threat_feed = ioc.get("feed", "ThreatFox (abuse.ch)")
+        threat_confidence = ioc.get("confidence", 98)
+        threat_name = ioc["threat"]
+        event_id = sig_id
         msg = f"IPS detection: Matched Threat Intelligence IOC {dst_ip} ({ioc['threat']}) - connection blocked"
         mitre_tactics = ["Command and Control", "Initial Access"]
         mitre_techniques = ["T1071", "T1043"]
@@ -125,16 +190,18 @@ def generate_fortinet_event():
             f'dstip={dst_ip} dstcountry="{ioc["country"]}" srcport={src_port} dstport={dst_port} '
             f'srcintf="port1" srcintfrole="lan" dstintf="port2" dstintfrole="wan" '
             f'sessionid={session_id} action="{action}" attack="{ioc["threat"]}" '
-            f'service="HTTPS" msg="{msg}"'
+            f'attackid="{attack_id}" sig_id="{sig_id}" threat_feed="{threat_feed}" '
+            f'threat_confidence={threat_confidence} service="HTTPS" msg="{msg}"'
         )
 
     elif scenario_type == "ips_attack":
-        sig_name, technique, severity = random.choice(IPS_ATTACK_SIGNATURES)
+        sig_name, technique, severity, sig_id, attack_id, threat_feed, threat_confidence = random.choice(IPS_ATTACK_SIGNATURES)
         dst_ip = random.choice(BENIGN_INTERNET_IPS)
         dst_port = random.choice([80, 443, 445, 8080, 22])
         action = "dropped"
         level = "alert"
-        event_id = "FG-IPS-ATTACK-0044"
+        threat_name = sig_name
+        event_id = sig_id
         msg = f"Intrusion Prevention signature triggered: {sig_name}"
         mitre_tactics = ["Defense Evasion", "Lateral Movement"]
         mitre_techniques = [technique]
@@ -144,7 +211,8 @@ def generate_fortinet_event():
             f'level="{level}" vd="{VDOM}" severity="{severity}" srcip={src_ip} '
             f'dstip={dst_ip} srcport={src_port} dstport={dst_port} srcintf="port1" '
             f'dstintf="port2" sessionid={session_id} action="{action}" attack="{sig_name}" '
-            f'direction="outgoing" msg="{msg}"'
+            f'attackid="{attack_id}" sig_id="{sig_id}" threat_feed="{threat_feed}" '
+            f'threat_confidence={threat_confidence} direction="outgoing" msg="{msg}"'
         )
 
     elif scenario_type == "ssl_vpn":
@@ -230,6 +298,12 @@ def generate_fortinet_event():
         "model": "FortiGate 100F",
         "mitre_tactics": mitre_tactics,
         "mitre_techniques": mitre_techniques,
+        "sig_id": sig_id,
+        "signature_id": sig_id,
+        "attack_id": attack_id,
+        "threat_feed": threat_feed,
+        "threat_confidence": threat_confidence,
+        "threat_name": threat_name,
     }
 
 # ---------------------------------------------------------------------------

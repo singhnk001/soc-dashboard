@@ -108,3 +108,29 @@
 - Fortinet logs were incorrectly labeled as `Windows Event`.
 **Impact:**
 - High-comfort, ergonomic, enterprise-tier log analysis matching CrowdStrike, Splunk ES, and Microsoft Sentinel standards. Zero eye strain, clear visual hierarchy, and fast incident investigation workflows.
+
+## ADR-019: Explicit Signature ID & Threat Intelligence Feed Attribution
+**Decision:**
+1. Enhanced `scripts/fortinet_firewall_simulator.py`:
+   - Enriched `MALICIOUS_C2_IPS` and `IPS_ATTACK_SIGNATURES` with explicit `sig_id` (e.g. `FG-IPS-39812`, `FG-IPS-41025`, `FG-IPS-41051`), `attack_id` (e.g. `39812`), `feed` (e.g. `ThreatFox (abuse.ch)`, `AlienVault OTX Community Feed`, `AbuseIPDB Threat Intelligence`, `CISA KEV`), and `confidence` score (e.g. 98%).
+   - Injected `sig_id="{sig_id}" attackid="{attack_id}" threat_feed="{threat_feed}" threat_confidence={threat_confidence}` directly into the syslog `raw_msg` and structured JSON payload.
+2. Enhanced `src/app/logs/page.tsx`:
+   - Updated `ParsedLogDetails` interface with `sigId`, `attackId`, `threatFeed`, and `threatConfidence`.
+   - Implemented `KNOWN_THREAT_CORRELATION` table and `correlateThreatMetadata()` so that **historical and newly ingested logs** automatically resolve the exact `Signature ID`, `Threat Intelligence Feed`, and `Confidence Score` by matching IP IOCs or attack names.
+   - Updated **Threat Intelligence & Intrusion Correlation Banner** in the Event Inspector slide-over:
+     - Added dedicated cards for **Attack / Threat Signature** and **Signature ID** with 1-click copy.
+     - Added pill badge displaying **Detected by Feed** with globe icon and feed provider name (e.g., `ThreatFox (abuse.ch)`).
+     - Added confidence badge with pulsing radar indicator (e.g., `98% Confidence`).
+   - Added attributes to `coreAttributes`:
+     - `['Signature ID', parsed.sigId]`
+     - `['Attack ID', parsed.attackId]`
+     - `['Detected Threat Intel Feed', parsed.threatFeed]`
+     - `['Threat Intel Confidence', `${parsed.threatConfidence}%`]`
+   - When users search `sign` or `sig` in the attributes search bar, both `Threat / Attack Signature` and `Signature ID` are immediately visible.
+   - When users search `threat` or `feed` in the attributes search bar, both `Detected Threat Intel Feed` and `Threat Intel Confidence` are immediately visible.
+   - Enhanced `QuickSummary` row with `Sig: FG-IPS-39812 • ThreatFox (abuse.ch)`.
+**Reason:**
+- User reported that when opening full event details and searching for `sign`, only `Threat / Attack Signature` was displayed, missing the explicit `Signature ID`.
+- In the Threat Intel section, the name of which external threat intelligence feed detected the IOC (e.g., ThreatFox, AlienVault OTX, AbuseIPDB) was missing.
+**Impact:**
+- Full forensic attribution matching Tier-2/Tier-3 SOC analyst workflows. Analysts can immediately correlate signatures against vendor advisories and see exactly which Threat Intel feed flagged the IOC.

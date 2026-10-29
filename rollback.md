@@ -6,11 +6,16 @@ This document provides exact step-by-step instructions to roll back changes made
 
 ## 1. Quick Git Rollback Checkpoints
 
-### Current Checkpoint (Post Event Inspector & UX Ergonomics Redesign)
+### Current Checkpoint (ADR-019: Explicit Signature ID & Threat Intel Feed Attribution)
 - **Commit:** Latest on `main`
-- **Features:** Redesigned Event Inspector slide-over (network flow visualizer, 3-tab layout, eye-comfort slate theme, no table squish), inline QuickSummary upgrade, `log_type: Firewall` normalization, auto-detecting Fortinet simulator (`scripts/fortinet_firewall_simulator.py`), `source_ip`/`destination_ip` extraction in `api/services/ingestion.py`, Next.js ingestion proxy (`/api/logs/ingest`), `/api/auth/login/mfa` route, FastAPI port 8002 proxying, safe date parsing (`date-utils.ts`), and global `ErrorBoundary`.
+- **Features:** 
+  - Added explicit `Signature ID` (`FG-IPS-39812`, `FG-IPS-41025`, `FG-IPS-41051`) and `Detected Threat Intel Feed` (`ThreatFox (abuse.ch)`, `AlienVault OTX Community Feed`, `AbuseIPDB Threat Intelligence`, `CISA KEV`) to the Threat Intelligence & Intrusion Correlation banner.
+  - Added `Signature ID` and `Detected Threat Intel Feed` to attributes list and live search in `src/app/logs/page.tsx` (searching `sign` displays both signature name and signature ID).
+  - Enriched `scripts/fortinet_firewall_simulator.py` with `sig_id`, `attack_id`, `threat_feed`, and `threat_confidence` in syslog strings and JSON payloads.
+  - Integrated `correlateThreatMetadata()` fallback in `src/app/logs/page.tsx` for full retrospective enrichment of existing and incoming logs.
 
 ### Previous Checkpoints:
+- **`72b9a1e`:** Event Inspector UX & Ergonomics redesign (dark slate theme, connection flow hero, 3 tabs).
 - **`1840e76`:** Simulator scope fix and default variable initialization.
 - **`4d875d7`:** Live simulator ingestion, IP extraction, and docs.
 - **`a9371dc`:** MFA route, admin fallback, dev server cache cleanup.
@@ -32,17 +37,21 @@ git reset --hard <checkpoint-hash>
 git push origin main --force
 ```
 
-### Procedure B: Reverting Event Inspector UI Only
-To restore the previous `logs/page.tsx`:
+### Procedure B: Reverting Signature ID and Threat Intel UI Changes Only
+To restore the previous `logs/page.tsx` and simulator:
 ```powershell
-git checkout 1840e76 -- src/app/logs/page.tsx
+git checkout 72b9a1e -- src/app/logs/page.tsx scripts/fortinet_firewall_simulator.py
 npm.cmd run build
 ```
 
-### Procedure C: Stopping the Fortinet Simulator
+### Procedure C: Stopping or Restarting the Fortinet Simulator
 To stop the background Fortinet simulator at any time:
 ```powershell
 Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*fortinet_firewall_simulator*" } | Stop-Process -Force
+```
+To restart the simulator:
+```powershell
+python scripts/fortinet_firewall_simulator.py --continuous --rate 1.0
 ```
 
 ---
