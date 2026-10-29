@@ -58,12 +58,21 @@ export default function AlertRateWidget() {
         const s = await r.json();
 
         // Build hourly buckets from logs_by_hour (already in stats)
-        // logs_by_hour shape: [{ hour: "2026-09-30T14:00:00", count: N }, ...]
+        // logs_by_hour shape: [{ hour: "00:00" | "2026-09-30T14:00:00", count: N }, ...]
         const raw: { hour: string; count: number }[] = s.logs_by_hour || [];
-        const buckets: HourBucket[] = raw.slice(-24).map(b => ({
-          hour: new Date(b.hour).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-          count: b.count,
-        }));
+        const buckets: HourBucket[] = raw.slice(-24).map(b => {
+          let label = String(b.hour || '');
+          if (label.includes('T') || label.includes('-')) {
+            const d = new Date(label);
+            if (!isNaN(d.getTime())) {
+              label = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            }
+          }
+          return {
+            hour: label,
+            count: b.count,
+          };
+        });
 
         const total = buckets.reduce((a, b) => a + b.count, 0);
         const half  = Math.floor(buckets.length / 2);
@@ -135,7 +144,7 @@ export default function AlertRateWidget() {
                 tick={{ fontSize: 10, fill: '#6b7280' }}
                 tickLine={false}
                 axisLine={false}
-                interval="preserveStartEnd"
+                interval={3}
               />
               <YAxis hide />
               <Tooltip

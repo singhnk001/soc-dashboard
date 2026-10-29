@@ -17,25 +17,27 @@ export default function TopSourcesChart({ data }: { data: SourceData[] }) {
   }));
 
   return (
-    <div className="h-[300px] w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-4">
-      <h3 className="text-[var(--text-primary)] text-lg font-medium mb-4">Top Log Sources</h3>
-      <ResponsiveContainer width="100%" height="85%">
-        <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2f3e" horizontal={false} />
-          <XAxis type="number" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
-          <YAxis dataKey="label" type="category" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} width={100} />
-          <Tooltip
-            contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #374151', color: '#fff', fontSize: 12 }}
-            cursor={{ fill: '#2a2f3e' }}
-            formatter={(value) => [value.toLocaleString(), 'Logs']}
-          />
-          <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={14}>
-            {chartData.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="h-[250px] w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-4 flex flex-col">
+      <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-2">Top Log Sources</h3>
+      <div className="flex-1 min-h-0 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2f3e" horizontal={false} />
+            <XAxis type="number" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} />
+            <YAxis dataKey="label" type="category" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} width={90} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #374151', color: '#fff', fontSize: 11 }}
+              cursor={{ fill: '#2a2f3e' }}
+              formatter={(value) => [value.toLocaleString(), 'Logs']}
+            />
+            <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={12}>
+              {chartData.map((_, i) => (
+                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

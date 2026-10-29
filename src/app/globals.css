@@ -16,9 +16,13 @@
   --accent-green: #22c55e;
 }
 
-/* High-density Enterprise SOC Dashboard scaling (75% default ratio) */
-html {
-  zoom: 0.75;
+/* Full-viewport reset to cover 100% of the screen without zoom distortion */
+html,
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .light-theme {

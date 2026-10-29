@@ -193,7 +193,7 @@ export default function ReferenceSetsPage() {
   const filteredItems = items.filter((i: any) => i.value.toLowerCase().includes(searchItem.toLowerCase()));
 
   return (
-    <div className="p-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)] h-[calc(100vh-4rem)] flex flex-col">
+    <div className="p-6 bg-[var(--bg-secondary)] min-h-full text-[var(--text-primary)] h-[calc(100vh-4rem)] flex flex-col">
       <div className="flex justify-between items-center mb-6 shrink-0">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Database className="text-indigo-400" /> Reference Sets</h1>

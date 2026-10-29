@@ -24,17 +24,17 @@ export default function SeverityChart({ data }: SeverityChartProps) {
   const total = data.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <div className="h-[300px] w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-4 flex flex-col">
-      <h3 className="text-[var(--text-primary)] text-lg font-medium mb-4">Events by Severity</h3>
-      <div className="flex-grow relative">
+    <div className="h-[250px] w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-4 flex flex-col">
+      <h3 className="text-[var(--text-primary)] text-sm font-semibold mb-2">Events by Severity</h3>
+      <div className="flex-1 min-h-0 relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={80}
+              innerRadius={50}
+              outerRadius={70}
               paddingAngle={5}
               dataKey="count"
             >
@@ -46,13 +46,13 @@ export default function SeverityChart({ data }: SeverityChartProps) {
               contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #374151', color: '#fff' }}
               itemStyle={{ color: '#fff' }}
             />
-            <Legend verticalAlign="bottom" height={36} />
+            <Legend verticalAlign="bottom" height={30} wrapperStyle={{ fontSize: '11px' }} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-6">
           <div className="text-center">
-            <span className="text-2xl font-bold text-[var(--text-primary)]">{total}</span>
-            <span className="block text-xs text-[var(--text-secondary)]">Total</span>
+            <span className="text-xl font-bold text-[var(--text-primary)]">{total}</span>
+            <span className="block text-[10px] text-[var(--text-secondary)]">Total</span>
           </div>
         </div>
       </div>

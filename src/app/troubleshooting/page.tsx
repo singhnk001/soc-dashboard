@@ -110,7 +110,7 @@ export default function TroubleshootingPage() {
   };
 
   return (
-    <div className="p-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
+    <div className="p-6 bg-[var(--bg-secondary)] min-h-full text-[var(--text-primary)]">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">

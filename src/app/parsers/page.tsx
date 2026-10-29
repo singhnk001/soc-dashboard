@@ -99,7 +99,7 @@ export default function ParsersPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
+    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-full text-[var(--text-primary)]">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Custom Log Parsers</h1>

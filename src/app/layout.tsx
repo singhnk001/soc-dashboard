@@ -17,20 +17,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark h-full w-full">
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('soc_display_scale')||'0.75';document.documentElement.style.zoom=s;}catch(e){}})();`,
+            __html: `(function(){try{localStorage.removeItem('soc_display_scale');if(document.documentElement){document.documentElement.style.zoom='';}}catch(e){}})();`,
           }}
         />
       </head>
-      <body className={`${inter.className} flex h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]`}>
+      <body className={`${inter.className} flex h-screen w-full overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
         <Sidebar />
-        <main className="flex-1 flex flex-col h-screen overflow-y-auto">
+        <div className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
           <Header />
-          {children}
-        </main>
+          <main className="flex-1 overflow-y-auto min-h-0 bg-[var(--bg-secondary)]">
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   );

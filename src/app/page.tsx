@@ -254,7 +254,7 @@ export default function DashboardPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-4 md:p-5 space-y-4 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
+    <div className="p-4 md:p-5 space-y-4 bg-[var(--bg-secondary)] min-h-full w-full text-[var(--text-primary)]">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">

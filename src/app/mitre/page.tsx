@@ -26,7 +26,7 @@ export default function MitrePage() {
   }
 
   return (
-    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-screen text-[var(--text-primary)]">
+    <div className="p-6 space-y-6 bg-[var(--bg-secondary)] min-h-full text-[var(--text-primary)]">
       <PageHeader 
         title="MITRE ATT&CK Framework"
         description="Mapping detections to adversarial tactics and techniques"
