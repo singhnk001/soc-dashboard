@@ -6,15 +6,16 @@ This document provides exact step-by-step instructions to roll back changes made
 
 ## 1. Quick Git Rollback Checkpoints
 
-### Current Checkpoint (ADR-019: Explicit Signature ID & Threat Intel Feed Attribution)
+### Current Checkpoint (ADR-020: Bi-Directional Source & Destination TI Correlation)
 - **Commit:** Latest on `main`
 - **Features:** 
+  - Bi-directional Threat Intelligence correlation across **both Source IP and Destination IP** in `src/app/logs/page.tsx` and `api/services/ingestion.py`.
   - Added explicit `Signature ID` (`FG-IPS-39812`, `FG-IPS-41025`, `FG-IPS-41051`) and `Detected Threat Intel Feed` (`ThreatFox (abuse.ch)`, `AlienVault OTX Community Feed`, `AbuseIPDB Threat Intelligence`, `CISA KEV`) to the Threat Intelligence & Intrusion Correlation banner.
   - Added `Signature ID` and `Detected Threat Intel Feed` to attributes list and live search in `src/app/logs/page.tsx` (searching `sign` displays both signature name and signature ID).
   - Enriched `scripts/fortinet_firewall_simulator.py` with `sig_id`, `attack_id`, `threat_feed`, and `threat_confidence` in syslog strings and JSON payloads.
-  - Integrated `correlateThreatMetadata()` fallback in `src/app/logs/page.tsx` for full retrospective enrichment of existing and incoming logs.
 
 ### Previous Checkpoints:
+- **`84775ac`:** Explicit Signature ID & Detected Threat Intel Feed Attribution (ADR-019).
 - **`72b9a1e`:** Event Inspector UX & Ergonomics redesign (dark slate theme, connection flow hero, 3 tabs).
 - **`1840e76`:** Simulator scope fix and default variable initialization.
 - **`4d875d7`:** Live simulator ingestion, IP extraction, and docs.
@@ -37,10 +38,10 @@ git reset --hard <checkpoint-hash>
 git push origin main --force
 ```
 
-### Procedure B: Reverting Signature ID and Threat Intel UI Changes Only
-To restore the previous `logs/page.tsx` and simulator:
+### Procedure B: Reverting Specific Files
+To restore the previous `logs/page.tsx`:
 ```powershell
-git checkout 72b9a1e -- src/app/logs/page.tsx scripts/fortinet_firewall_simulator.py
+git checkout 84775ac -- src/app/logs/page.tsx
 npm.cmd run build
 ```
 

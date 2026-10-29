@@ -155,9 +155,14 @@ const KNOWN_THREAT_CORRELATION: Record<string, { sigId: string; attackId?: strin
   '185.130.5.231':  { sigId: 'FG-IPS-22891', attackId: '22891', feed: 'AbuseIPDB Blacklist', confidence: 90, name: 'Mirai Scanner / Brute-force' },
 };
 
-function correlateThreatMetadata(attackName?: string | null, dstIp?: string | null, eventId?: string | number | null): { sigId?: string; attackId?: string; feed?: string; confidence?: number; name?: string } {
+function correlateThreatMetadata(attackName?: string | null, dstIp?: string | null, eventId?: string | number | null, srcIp?: string | null): { sigId?: string; attackId?: string; feed?: string; confidence?: number; name?: string } {
+  // Check Destination IP (outbound C2 / malware / data exfiltration)
   if (dstIp && KNOWN_THREAT_CORRELATION[dstIp]) {
     return KNOWN_THREAT_CORRELATION[dstIp];
+  }
+  // Check Source IP (inbound scanners / brute-force / external exploit origin)
+  if (srcIp && KNOWN_THREAT_CORRELATION[srcIp]) {
+    return KNOWN_THREAT_CORRELATION[srcIp];
   }
   const text = `${attackName || ''} ${eventId || ''}`.toLowerCase();
   if (text.includes('emotet')) return { sigId: 'FG-IPS-39812', attackId: '39812', feed: 'ThreatFox (abuse.ch)', confidence: 98, name: 'Emotet Botnet Dropper' };
@@ -234,7 +239,8 @@ function parseRawLogData(rawLog: any, message: string | null, logContext?: Parti
 
   // Smart correlation fallback for historical or simulated logs
   const dstIp = kvMap.dstip || kvMap.dst_ip || logContext?.destinationIp;
-  const correlation = correlateThreatMetadata(attack, dstIp, logContext?.eventId);
+  const srcIp = kvMap.srcip || kvMap.src_ip || logContext?.sourceIp;
+  const correlation = correlateThreatMetadata(attack, dstIp, logContext?.eventId, srcIp);
   if (!sigId && correlation.sigId) sigId = correlation.sigId;
   if (!attackId && correlation.attackId) attackId = correlation.attackId;
   if (!threatFeed && correlation.feed) threatFeed = correlation.feed;

@@ -134,3 +134,16 @@
 - In the Threat Intel section, the name of which external threat intelligence feed detected the IOC (e.g., ThreatFox, AlienVault OTX, AbuseIPDB) was missing.
 **Impact:**
 - Full forensic attribution matching Tier-2/Tier-3 SOC analyst workflows. Analysts can immediately correlate signatures against vendor advisories and see exactly which Threat Intel feed flagged the IOC.
+
+
+## ADR-020: Bi-Directional (Source & Destination IP) Threat Intelligence Correlation
+**Decision:**
+1. Upgraded `correlateThreatMetadata()` and `parseRawLogData()` in `src/app/logs/page.tsx` to evaluate both `dstIp` (outbound C2, malware beacon, data exfiltration) and `srcIp` (inbound scanner, brute-force, external exploit attempts).
+2. Confirmed that the ingestion engine in `api/services/ingestion.py` scans all public IPs across the entire raw log (both source and destination) against the PostgreSQL `threat_indicators` table.
+**Reason:**
+- In an enterprise SOC, threats arrive from both directions:
+  - **Inbound Attacks** (Internet Attacker ➔ Firewall / DMZ / Server): The malicious IOC is the **Source IP** (`srcip`).
+  - **Outbound Connections** (Compromised Internal Host ➔ External C2 Server): The malicious IOC is the **Destination IP** (`dstip`).
+- Evaluating only destination IPs creates a blind spot for inbound perimeter probes, brute-force attacks, and external exploit attempts.
+**Impact:**
+- Complete 360-degree Threat Intelligence coverage across both inbound attack vectors and outbound compromises.

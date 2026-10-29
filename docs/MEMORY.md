@@ -13,7 +13,7 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 | FastAPI API | ✅ Running | `0.0.0.0:8002`, `--workers 1` |
 | Next.js Frontend | ✅ Running (Port 3000) | Standard responsive layout, `h-screen w-full`, 40 routes compiled |
 | Event Inspector Slide-Over | 🌟 Modernized | High-comfort dark slate theme, Network Flow visualizer, 3-tab layout, zero glare |
-| Threat Intel & Signatures | 🛡️ Enriched | Explicit `Signature ID` (`FG-IPS-39812`), `Detected Threat Intel Feed` (ThreatFox, AlienVault, etc.), and `Confidence %` |
+| Threat Intel & Signatures | 🛡️ Bi-Directional | Explicit `Signature ID` (`FG-IPS-39812`), `Detected Threat Intel Feed`, and `Confidence %` evaluating **BOTH Source and Destination IPs** |
 | Authentication & MFA | ✅ Active | `/api/auth/login` (admin + demo + port 8002 proxy) & `/api/auth/login/mfa` |
 | Fortinet FortiGate Simulator | 🟢 Streaming | Continuous real-time background daemon (1-2 logs/sec) with enriched signature IDs and feeds |
 | Log Ingestion & Extraction | ✅ Fixed | `source_ip`, `destination_ip`, and `log_type: Firewall` properly classified |
@@ -25,10 +25,12 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 
 ## Known Issues, Quirks & Workarounds
 
-### Threat Intelligence & Signature ID Correlation (ADR-019)
+### Threat Intelligence: Bi-Directional Source & Destination Correlation (ADR-019 & ADR-020)
+- **Source & Destination Coverage:** Threat Intelligence auto-detection inspects **both** `source_ip` and `destination_ip`.
+  - **Inbound Attacks:** When external adversaries (e.g., scanners, brute-force sources, botnets) hit the perimeter, their IP is in `source_ip` (`srcip`). The engine queries AlienVault, ThreatFox, AbuseIPDB, and CISA KEV to identify the attacker.
+  - **Outbound Connections:** When an internal compromised client initiates an outbound beacon to a C2 or malware host, the malicious IP is in `destination_ip` (`dstip`). The engine correlates the C2 server and attributes the feed.
 - **Signature ID Visibility:** Displayed in both the Threat Intelligence hero card and the Attributes search table. Searching `sign` matches both `Threat / Attack Signature` and `Signature ID`.
 - **Feed Attribution:** Every flagged event clearly attributes the detecting feed (e.g. `ThreatFox (abuse.ch)`, `AlienVault OTX Community Feed`, `AbuseIPDB Threat Intelligence`, `CISA KEV`) along with a confidence rating.
-- **Historical Fallback:** Even for logs ingested before the simulator updates, `correlateThreatMetadata()` automatically correlates destination IPs and attack names to identify the correct signature ID and threat feed.
 
 ### Event Inspector & UX Ergonomics
 - **No Table Squishing:** Event slide-over uses standard fixed overlay (`w-[640px] max-w-[95vw]` with `bg-black/60 backdrop-blur-[2px]`). Main table width does not contract or shift horizontally.
