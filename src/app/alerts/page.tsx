@@ -243,7 +243,7 @@ function AlertInvestigationNotes({ alertId, onNoteAdded }: { alertId: string; on
     if (!comment.trim()) return;
     setSubmitting(true);
     try {
-      const activeUser = sessionStorage.getItem('soc_user') || 'Administrator';
+      const activeUser = sessionStorage.getItem('soc_real_name') || sessionStorage.getItem('soc_user') || 'Administrator';
       await alertsService.addComment(alertId, {
         user: activeUser,
         comment: comment.trim(),
@@ -268,10 +268,10 @@ function AlertInvestigationNotes({ alertId, onNoteAdded }: { alertId: string; on
         <span className="text-slate-400 font-mono text-[11px]">{comments.length} entries</span>
       </div>
 
-      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+      <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
         {comments.length === 0 ? (
           <div className="text-xs text-slate-400 italic p-4 text-center bg-[#090e18] rounded-lg border border-slate-800">
-            No investigation notes added yet. Record your initial assessment below.
+            No investigation notes recorded yet. Add your initial assessment below.
           </div>
         ) : (
           comments.map((c: AlertComment) => (
@@ -303,7 +303,7 @@ function AlertInvestigationNotes({ alertId, onNoteAdded }: { alertId: string; on
           type="text"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Log investigation action, triage verdict, or remediation steps..."
+          placeholder="Log triage verdict, indicator pivot findings, or remediation action..."
           className="flex-1 bg-[#090e18] border border-slate-700/80 rounded-lg px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
         />
         <button
@@ -346,16 +346,17 @@ export default function AlertsPage() {
   const [bulkAssignee, setBulkAssignee] = useState('');
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
-  // Slide-over & Investigation Drawer
+  // Investigation Modal / Popup Window State
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
-  const [drawerTab, setDrawerTab] = useState<'overview' | 'flow' | 'tags' | 'raw' | 'notes'>('overview');
+  const [drawerTab, setDrawerTab] = useState<'overview' | 'tags' | 'raw' | 'notes' | 'resolve'>('overview');
   const [attrSearch, setAttrSearch] = useState('');
   const [rawCopied, setRawCopied] = useState(false);
   const [sigCopied, setSigCopied] = useState(false);
   const [srcIpCopied, setSrcIpCopied] = useState(false);
   const [dstIpCopied, setDstIpCopied] = useState(false);
+  const [isUpdatingAlert, setIsUpdatingAlert] = useState(false);
 
-  // Close / Resolve Modal State
+  // Standalone Resolution Modal State
   const [resolvingAlert, setResolvingAlert] = useState<Alert | null>(null);
   const [resolveType, setResolveType] = useState<'true_positive' | 'false_positive'>('true_positive');
   const [resolveNotes, setResolveNotes] = useState('');
@@ -432,11 +433,13 @@ export default function AlertsPage() {
   useEffect(() => {
     if (selectedAlert) {
       const updated = rawAlerts.find(a => a.id === selectedAlert.id);
-      if (updated) setSelectedAlert(updated);
+      if (updated) {
+        setSelectedAlert(prev => ({ ...prev, ...updated }));
+      }
     }
   }, [rawAlerts]);
 
-  // Keyboard shortcut: Escape closes drawer and modal
+  // Keyboard shortcut: Escape closes modal popup
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -448,17 +451,24 @@ export default function AlertsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedAlert, resolvingAlert]);
 
-  // Single Alert Update Action
+  // Single Alert Update Action (Assignee, Status, Resolution)
   const handleUpdateAlert = async (
     alertId: string,
     payload: { status?: string; assigned_to?: string; resolution_type?: string; notes?: string }
   ) => {
+    setIsUpdatingAlert(true);
+    // Optimistic update for instant UI feedback
+    if (selectedAlert && selectedAlert.id === alertId) {
+      setSelectedAlert(prev => prev ? ({ ...prev, ...payload, status: (payload.status as any) || prev.status }) : null);
+    }
     try {
       await alertsService.updateAlert(alertId, payload);
       mutateAlerts();
       mutate('/api/stats');
     } catch (err) {
       console.error('Failed to update alert', err);
+    } finally {
+      setIsUpdatingAlert(false);
     }
   };
 
@@ -517,18 +527,27 @@ export default function AlertsPage() {
     );
   };
 
-  // Submit Resolution Modal
+  // Submit Resolution Action
   const submitResolution = async () => {
-    if (!resolvingAlert) return;
+    const targetAlert = resolvingAlert || selectedAlert;
+    if (!targetAlert) return;
     setIsResolving(true);
     try {
-      await alertsService.updateAlert(resolvingAlert.id, {
+      await alertsService.updateAlert(targetAlert.id, {
         status: 'resolved',
         resolution_type: resolveType,
         notes: resolveNotes.trim() || (resolveType === 'true_positive' ? 'Confirmed True Positive - Mitigated' : 'Investigated - False Positive Rule Exception'),
       });
       setResolvingAlert(null);
       setResolveNotes('');
+      if (selectedAlert && selectedAlert.id === targetAlert.id) {
+        setSelectedAlert(prev => prev ? ({
+          ...prev,
+          status: 'resolved' as any,
+          resolution_type: resolveType,
+          notes: resolveNotes.trim()
+        }) : null);
+      }
       mutateAlerts();
       mutate('/api/stats');
     } catch (err) {
@@ -582,7 +601,7 @@ export default function AlertsPage() {
     });
   };
 
-  // Parsed details for the slide-over
+  // Parsed details for the popup workstation
   const parsedInspector = useMemo(() => {
     if (!selectedAlert) return null;
     return parseAlertLog(selectedAlert.raw_log, selectedAlert.extracted_fields, selectedAlert);
@@ -877,7 +896,7 @@ export default function AlertsPage() {
         </div>
       )}
 
-      {/* ── Enterprise SOC Alerts Data Table ── */}
+      {/* ── Enterprise SOC Alerts Data Table (Full Width, Unsquished) ── */}
       <div className="bg-[#0c1220] border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         {alertsLoading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3">
@@ -909,11 +928,11 @@ export default function AlertsPage() {
                   <th className="px-3 py-3 font-semibold">Severity</th>
                   <th className="px-3 py-3 font-semibold">Incident / Threat Signature</th>
                   <th className="px-3 py-3 font-semibold">Telemetry Flow (Source ➔ Target)</th>
-                  <th className="px-3 py-3 font-semibold">Source</th>
+                  <th className="px-3 py-3 font-semibold">Source Sensor</th>
                   <th className="px-3 py-3 font-semibold">Assigned Analyst</th>
                   <th className="px-3 py-3 font-semibold">Status</th>
                   <th className="px-3 py-3 font-semibold">Detected</th>
-                  <th className="px-3 py-3 font-semibold text-right pr-4">Triage Action</th>
+                  <th className="px-3 py-3 font-semibold text-right pr-4">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">
@@ -922,16 +941,15 @@ export default function AlertsPage() {
                   const parsed = parseAlertLog(alert.raw_log, alert.extracted_fields, alert);
                   const statusInfo = STATUS_BADGE[alert.status] || STATUS_BADGE.new;
                   const isSelected = selectedAlertIds.includes(alert.id);
-                  const isDrawerOpen = selectedAlert?.id === alert.id;
                   const assignedName = alert.assigned_to || alert.assignedTo;
 
                   return (
                     <tr
                       key={alert.id}
                       onClick={() => setSelectedAlert(alert)}
-                      className={`hover:bg-slate-800/40 transition-colors cursor-pointer group ${
-                        isDrawerOpen ? 'bg-blue-950/20 border-l-2 border-l-blue-500' : ''
-                      } ${isSelected ? 'bg-blue-900/10' : ''}`}
+                      className={`hover:bg-slate-800/50 transition-colors cursor-pointer group ${
+                        isSelected ? 'bg-blue-900/10' : ''
+                      }`}
                     >
                       {/* Checkbox */}
                       <td className="px-3.5 py-3 text-center" onClick={(e) => toggleSelectAlert(alert.id, e)}>
@@ -993,7 +1011,7 @@ export default function AlertsPage() {
                             )}
                           </div>
                         ) : (
-                          <span className="text-slate-500 text-xs italic">Internal System Event</span>
+                          <span className="text-slate-500 text-xs italic">System / Host Event</span>
                         )}
                       </td>
 
@@ -1007,7 +1025,7 @@ export default function AlertsPage() {
                       {/* Assigned Analyst */}
                       <td className="px-3 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {assignedName ? (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-300 border border-blue-500/25">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-300 border border-blue-500/30">
                             <User size={11} />
                             <span>{assignedName}</span>
                           </div>
@@ -1076,445 +1094,557 @@ export default function AlertsPage() {
       </div>
 
       {/* ════════════════════════════════════════════════════════════ */}
-      {/* ── SLIDE-OVER INVESTIGATION INSPECTOR (Logs Style) ───────── */}
+      {/* ── INVESTIGATION MODAL POPUP WINDOW (Centered Workstation) ─ */}
       {/* ════════════════════════════════════════════════════════════ */}
       {selectedAlert && parsedInspector && (
-        <div className="fixed inset-y-0 right-0 w-[680px] max-w-[95vw] bg-[#0c1220] border-l border-slate-800 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-200">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-[#0e1626]/90 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/25 flex items-center justify-center">
-                <ShieldAlert className="w-4 h-4 text-blue-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-100">Incident Investigation</span>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${SEV_BADGE[(selectedAlert.severity || 'medium').toLowerCase()] || SEV_BADGE.info}`}>
-                    {selectedAlert.severity?.toUpperCase()}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
-                    {selectedAlert.source || 'Fortinet-FortiGate'}
-                  </span>
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedAlert(null);
+          }}
+        >
+          <div className="w-full max-w-5xl max-h-[92vh] bg-[#0c1220] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0e1626] shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center shadow-inner">
+                  <ShieldAlert className="w-5 h-5 text-blue-400" />
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
-                  <span className="font-mono text-slate-300">ID: {selectedAlert.id.substring(0, 8)}</span>
-                  <span>•</span>
-                  <span className="font-mono">{safeDistanceToNow(selectedAlert.timestamp)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => copyText(parsedInspector.cleanLine, setRawCopied)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700 rounded-md border border-slate-700 transition-colors"
-                title="Copy Raw Log"
-              >
-                {rawCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                <span>{rawCopied ? 'Copied' : 'Copy'}</span>
-              </button>
-              <button
-                onClick={() => setSelectedAlert(null)}
-                className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
-                title="Close (Esc)"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          </div>
-
-          {/* Scrollable Body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            {/* ── Analyst Triage & Assignment Bar ── */}
-            <div className="bg-[#11192a] border border-slate-800 rounded-xl p-3.5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-                <div className="flex items-center gap-1.5">
-                  <UserCheck size={13} className="text-blue-400" />
-                  <span>Analyst Assignment & Incident Status</span>
-                </div>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${STATUS_BADGE[selectedAlert.status]?.class || STATUS_BADGE.new.class}`}>
-                  {STATUS_BADGE[selectedAlert.status]?.label || selectedAlert.status}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                {/* Dynamic Assignee Dropdown */}
                 <div>
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                    Assigned Analyst
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedAlert.assigned_to || selectedAlert.assignedTo || ''}
-                      onChange={(e) => handleUpdateAlert(selectedAlert.id, { assigned_to: e.target.value })}
-                      className="flex-1 bg-[#090e18] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="">Unassigned</option>
-                      <option value={currentUser}>{currentUser} (Me)</option>
-                      {activeUsers.map(u => (
-                        <option key={u.id} value={u.real_name || u.username}>
-                          {u.real_name || u.username} ({u.role})
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      onClick={() => handleUpdateAlert(selectedAlert.id, { assigned_to: currentUser, status: 'investigating' })}
-                      className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-medium whitespace-nowrap transition-colors"
-                      title="Assign this incident to yourself"
-                    >
-                      Assign to Me
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status Triage Controls */}
-                <div>
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                    Lifecycle Workflow
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleUpdateAlert(selectedAlert.id, { status: 'investigating' })}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                        selectedAlert.status === 'investigating'
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                          : 'bg-[#090e18] text-slate-400 hover:text-slate-200 border-slate-700'
-                      }`}
-                    >
-                      Investigating
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setResolvingAlert(selectedAlert);
-                        setResolveType('true_positive');
-                        setResolveNotes('');
-                      }}
-                      className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 transition-all shadow-sm"
-                    >
-                      Close / Resolve
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Connection & Telemetry Flow Hero Visualizer ── */}
-            {(parsedInspector.srcIp || parsedInspector.dstIp) && (
-              <div className="bg-[#11192a] border border-slate-800 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <Network size={13} className="text-blue-400" />
-                    <span>Connection & Telemetry Flow</span>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${ACTION_BADGE[parsedInspector.action?.toLowerCase() || 'deny'] || 'text-rose-300 bg-rose-500/15 border-rose-500/30'}`}>
-                    {(parsedInspector.action || 'BLOCKED').toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-11 items-center gap-2 text-center bg-[#090d16] p-3.5 rounded-lg border border-slate-800/80">
-                  {/* Source Node */}
-                  <div className="col-span-4 text-left">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Source (Client / Inbound)</div>
-                    <div className="font-mono text-sm font-bold text-slate-100 mt-0.5 truncate" title={parsedInspector.srcIp}>
-                      {parsedInspector.srcIp || '—'}
-                    </div>
-                    <div className="text-[11px] text-slate-400 font-mono">
-                      {parsedInspector.srcPort ? `Port ${parsedInspector.srcPort}` : 'Ephemeral'}
-                    </div>
-                    {parsedInspector.srcIp && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <button
-                          onClick={() => copyText(parsedInspector.srcIp!, setSrcIpCopied)}
-                          className="text-[10px] text-slate-400 hover:text-slate-200 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/80 flex items-center gap-1"
-                        >
-                          {srcIpCopied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                          <span>Copy</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Center Flow Arrow */}
-                  <div className="col-span-3 flex flex-col items-center justify-center">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      {parsedInspector.protocol || 'IP'}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-base font-bold text-white tracking-tight">{selectedAlert.title}</span>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold border ${SEV_BADGE[(selectedAlert.severity || 'medium').toLowerCase()] || SEV_BADGE.info}`}>
+                      {selectedAlert.severity?.toUpperCase()}
                     </span>
-                    <div className="w-full flex items-center justify-center my-1">
-                      <div className="h-0.5 flex-1 bg-slate-700"></div>
-                      <ArrowRight size={14} className="text-blue-400 shrink-0 mx-1" />
-                      <div className="h-0.5 flex-1 bg-slate-700"></div>
-                    </div>
-                    <span className="text-[10px] font-mono text-blue-300 truncate max-w-[120px]">
-                      {parsedInspector.service || 'Firewall'}
+                    <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                      {selectedAlert.source || 'Fortinet-FortiGate'}
                     </span>
                   </div>
-
-                  {/* Destination Node */}
-                  <div className="col-span-4 text-right">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Destination (Service / Target)</div>
-                    <div className="font-mono text-sm font-bold text-slate-100 mt-0.5 truncate" title={parsedInspector.dstIp}>
-                      {parsedInspector.dstIp || '—'}
-                    </div>
-                    <div className="text-[11px] text-slate-400 font-mono">
-                      {parsedInspector.dstPort ? `Port ${parsedInspector.dstPort}` : 'Target Port'}
-                    </div>
-                    {parsedInspector.dstIp && (
-                      <div className="flex items-center justify-end gap-1.5 mt-2">
-                        <button
-                          onClick={() => copyText(parsedInspector.dstIp!, setDstIpCopied)}
-                          className="text-[10px] text-slate-400 hover:text-slate-200 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/80 flex items-center gap-1"
-                        >
-                          {dstIpCopied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                          <span>Copy</span>
-                        </button>
-                      </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                    <span className="font-mono text-slate-300">Incident ID: {selectedAlert.id}</span>
+                    <span>•</span>
+                    <span className="font-mono">{safeDistanceToNow(selectedAlert.timestamp)}</span>
+                    {selectedAlert.eventId && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-slate-400">EventID: {selectedAlert.eventId}</span>
+                      </>
                     )}
                   </div>
                 </div>
               </div>
-            )}
 
-            {/* ── Threat Intelligence & Intrusion Correlation Banner ── */}
-            <div className="bg-gradient-to-br from-rose-950/40 via-[#131b2e] to-slate-900/90 border border-rose-500/30 rounded-xl p-4 shadow-lg space-y-3">
-              <div className="flex items-center justify-between border-b border-rose-500/20 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert size={17} className="text-rose-400 shrink-0" />
-                  <span className="text-xs font-bold text-rose-200 uppercase tracking-wider">
-                    Threat Intelligence & Intrusion Correlation
-                  </span>
-                </div>
-                {parsedInspector.threatConfidence ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
-                    {parsedInspector.threatConfidence}% Confidence
-                  </span>
-                ) : null}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => copyText(parsedInspector.cleanLine, setRawCopied)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors"
+                  title="Copy Raw Log Payload"
+                >
+                  {rawCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                  <span>{rawCopied ? 'Copied' : 'Copy Log'}</span>
+                </button>
+                <button
+                  onClick={() => setSelectedAlert(null)}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                  title="Close (Esc)"
+                >
+                  <X size={20} />
+                </button>
               </div>
+            </div>
 
-              {/* Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="bg-[#0b101b]/90 border border-slate-800 rounded-lg p-2.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Attack / Threat Signature
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* ── Analyst Assignment & Triage Command Bar ── */}
+              <div className="bg-[#11192a] border border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                  <div className="flex items-center gap-1.5">
+                    <UserCheck size={14} className="text-blue-400" />
+                    <span>Incident Assignment & Triage Workflow</span>
                   </div>
-                  <div className="text-xs font-bold text-rose-200 font-mono mt-1 break-words">
-                    {parsedInspector.attack || selectedAlert.title}
-                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${STATUS_BADGE[selectedAlert.status]?.class || STATUS_BADGE.new.class}`}>
+                    {STATUS_BADGE[selectedAlert.status]?.label || selectedAlert.status}
+                  </span>
                 </div>
 
-                {parsedInspector.sigId && (
-                  <div className="bg-[#0b101b]/90 border border-slate-800 rounded-lg p-2.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      Signature ID
-                    </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs font-bold text-amber-300 font-mono">
-                        {parsedInspector.sigId}
-                      </span>
-                      <button
-                        onClick={() => copyText(parsedInspector.sigId!, setSigCopied)}
-                        className="px-1.5 py-0.5 text-slate-400 hover:text-slate-200 bg-slate-800 rounded border border-slate-700 text-[10px] flex items-center gap-1"
-                        title="Copy Signature ID"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                  {/* Dynamic Analyst Dropdown */}
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                      Assigned Analyst
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedAlert.assigned_to || selectedAlert.assignedTo || ''}
+                        disabled={isUpdatingAlert}
+                        onChange={(e) => handleUpdateAlert(selectedAlert.id, { assigned_to: e.target.value })}
+                        className="flex-1 bg-[#090e18] border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:border-blue-500 focus:outline-none transition-colors"
                       >
-                        {sigCopied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                        <span>Copy</span>
+                        <option value="">Unassigned</option>
+                        <option value={currentUser}>{currentUser} (Me)</option>
+                        {activeUsers.map(u => (
+                          <option key={u.id} value={u.real_name || u.username}>
+                            {u.real_name || u.username} ({u.role})
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={() => handleUpdateAlert(selectedAlert.id, { assigned_to: currentUser, status: 'investigating' })}
+                        disabled={isUpdatingAlert}
+                        className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                        title="Assign ownership to yourself"
+                      >
+                        <UserCheck size={13} />
+                        <span>Assign to Me</span>
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* Badges Row */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
-                {parsedInspector.threatFeed && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">
-                    <Globe size={12} className="text-blue-400 shrink-0" />
-                    <span className="text-slate-400">Detected by:</span>
-                    <span className="text-white font-mono font-bold">{parsedInspector.threatFeed}</span>
+                  {/* Lifecycle Workflow Controls */}
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                      Status Workflow
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleUpdateAlert(selectedAlert.id, { status: 'investigating' })}
+                        disabled={isUpdatingAlert}
+                        className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
+                          selectedAlert.status === 'investigating'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                            : 'bg-[#090e18] text-slate-400 hover:text-slate-200 border-slate-700'
+                        }`}
+                      >
+                        <Clock size={13} />
+                        <span>Investigating</span>
+                      </button>
+
+                      <button
+                        onClick={() => setDrawerTab('resolve')}
+                        className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
+                          drawerTab === 'resolve'
+                            ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                            : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/40'
+                        }`}
+                      >
+                        <CheckCircle2 size={13} />
+                        <span>Close / Resolve Incident</span>
+                      </button>
+                    </div>
                   </div>
-                )}
-
-                {selectedAlert.mitreRef && (
-                  <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono">
-                    MITRE ATT&CK: {selectedAlert.mitreRef}
-                  </span>
-                )}
+                </div>
               </div>
-            </div>
 
-            {/* ── Inspector Tabs ── */}
-            <div className="flex items-center gap-1 p-1 bg-[#101726] rounded-lg border border-slate-800">
-              <button
-                onClick={() => setDrawerTab('overview')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                  drawerTab === 'overview' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <ShieldCheck size={13} />
-                <span>Overview & Fields</span>
-              </button>
-              <button
-                onClick={() => setDrawerTab('tags')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                  drawerTab === 'tags' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Tag size={13} />
-                <span>Tags ({parsedInspector.kvPairs.length})</span>
-              </button>
-              <button
-                onClick={() => setDrawerTab('raw')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                  drawerTab === 'raw' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <FileText size={13} />
-                <span>Raw Log</span>
-              </button>
-              <button
-                onClick={() => setDrawerTab('notes')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                  drawerTab === 'notes' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Clock size={13} />
-                <span>Timeline & Notes</span>
-              </button>
-            </div>
+              {/* ── Connection & Telemetry Flow Hero Visualizer ── */}
+              {(parsedInspector.srcIp || parsedInspector.dstIp) && (
+                <div className="bg-[#11192a] border border-slate-800 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <Network size={14} className="text-blue-400" />
+                      <span>Connection & Telemetry Flow</span>
+                    </div>
+                    <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${ACTION_BADGE[parsedInspector.action?.toLowerCase() || 'deny'] || 'text-rose-300 bg-rose-500/15 border-rose-500/30'}`}>
+                      {(parsedInspector.action || 'BLOCKED').toUpperCase()}
+                    </span>
+                  </div>
 
-            {/* ── TAB 1: OVERVIEW & EXTRACTED FIELDS ── */}
-            {drawerTab === 'overview' && (
-              <div className="space-y-3">
-                {/* Search in attributes */}
-                <div className="relative">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={attrSearch}
-                    onChange={(e) => setAttrSearch(e.target.value)}
-                    placeholder="Search attributes (e.g. sign, ip, feed, port)..."
-                    className="w-full bg-[#0a0e18] border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                  />
-                  {attrSearch && (
-                    <button onClick={() => setAttrSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
-                      <X size={12} />
-                    </button>
+                  <div className="grid grid-cols-11 items-center gap-2 text-center bg-[#090d16] p-4 rounded-xl border border-slate-800/80">
+                    {/* Source Node */}
+                    <div className="col-span-4 text-left">
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Source (Client / Inbound)</div>
+                      <div className="font-mono text-base font-bold text-slate-100 mt-0.5 truncate" title={parsedInspector.srcIp}>
+                        {parsedInspector.srcIp || '—'}
+                      </div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">
+                        {parsedInspector.srcPort ? `Port ${parsedInspector.srcPort}` : 'Ephemeral Port'}
+                      </div>
+                      {parsedInspector.srcIp && (
+                        <div className="flex items-center gap-1.5 mt-2.5">
+                          <button
+                            onClick={() => copyText(parsedInspector.srcIp!, setSrcIpCopied)}
+                            className="text-[11px] text-slate-400 hover:text-slate-200 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/80 flex items-center gap-1"
+                          >
+                            {srcIpCopied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                            <span>Copy IP</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Center Flow Arrow */}
+                    <div className="col-span-3 flex flex-col items-center justify-center">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                        {parsedInspector.protocol || 'IP'}
+                      </span>
+                      <div className="w-full flex items-center justify-center my-1.5">
+                        <div className="h-0.5 flex-1 bg-slate-700"></div>
+                        <ArrowRight size={16} className="text-blue-400 shrink-0 mx-1.5" />
+                        <div className="h-0.5 flex-1 bg-slate-700"></div>
+                      </div>
+                      <span className="text-xs font-mono text-blue-300 truncate max-w-[140px]">
+                        {parsedInspector.service || 'Firewall'}
+                      </span>
+                    </div>
+
+                    {/* Destination Node */}
+                    <div className="col-span-4 text-right">
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Destination (Service / Target)</div>
+                      <div className="font-mono text-base font-bold text-slate-100 mt-0.5 truncate" title={parsedInspector.dstIp}>
+                        {parsedInspector.dstIp || '—'}
+                      </div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">
+                        {parsedInspector.dstPort ? `Port ${parsedInspector.dstPort}` : 'Target Port'}
+                      </div>
+                      {parsedInspector.dstIp && (
+                        <div className="flex items-center justify-end gap-1.5 mt-2.5">
+                          <button
+                            onClick={() => copyText(parsedInspector.dstIp!, setDstIpCopied)}
+                            className="text-[11px] text-slate-400 hover:text-slate-200 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/80 flex items-center gap-1"
+                          >
+                            {dstIpCopied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                            <span>Copy IP</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Threat Intelligence & Intrusion Correlation Banner ── */}
+              <div className="bg-gradient-to-br from-rose-950/40 via-[#131b2e] to-slate-900/90 border border-rose-500/30 rounded-xl p-4 shadow-lg space-y-3">
+                <div className="flex items-center justify-between border-b border-rose-500/20 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert size={17} className="text-rose-400 shrink-0" />
+                    <span className="text-xs font-bold text-rose-200 uppercase tracking-wider">
+                      Threat Intelligence & Intrusion Correlation
+                    </span>
+                  </div>
+                  {parsedInspector.threatConfidence ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
+                      {parsedInspector.threatConfidence}% Confidence
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-[#0b101b]/90 border border-slate-800 rounded-lg p-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Attack / Threat Signature
+                    </div>
+                    <div className="text-xs font-bold text-rose-200 font-mono mt-1 break-words">
+                      {parsedInspector.attack || selectedAlert.title}
+                    </div>
+                  </div>
+
+                  {parsedInspector.sigId && (
+                    <div className="bg-[#0b101b]/90 border border-slate-800 rounded-lg p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Signature ID
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs font-bold text-amber-300 font-mono">
+                          {parsedInspector.sigId}
+                        </span>
+                        <button
+                          onClick={() => copyText(parsedInspector.sigId!, setSigCopied)}
+                          className="px-2 py-0.5 text-slate-400 hover:text-slate-200 bg-slate-800 rounded border border-slate-700 text-[10px] flex items-center gap-1"
+                          title="Copy Signature ID"
+                        >
+                          {sigCopied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                          <span>Copy</span>
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {/* Attribute Table */}
-                <div className="bg-[#090d16] border border-slate-800 rounded-xl overflow-hidden shadow-inner">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[#0c1220] border-b border-slate-800 text-slate-400 text-[10px] uppercase font-semibold">
-                      <tr>
-                        <th className="px-3.5 py-2.5 w-44">Attribute</th>
-                        <th className="px-3.5 py-2.5">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono">
-                      {[
-                        ['Incident Title', selectedAlert.title],
-                        ['Severity', selectedAlert.severity?.toUpperCase()],
-                        ['Incident Status', selectedAlert.status],
-                        ['Assigned Analyst', selectedAlert.assigned_to || selectedAlert.assignedTo || 'Unassigned'],
-                        ['Timestamp', selectedAlert.timestamp],
-                        ['Source / Sensor', selectedAlert.source || 'Fortinet-FortiGate'],
-                        ['Hostname / Device', parsedInspector.hostname || 'FG-100F-HQ-CORE'],
-                        ['Event ID', String(selectedAlert.eventId || '—')],
-                        ...(parsedInspector.attack ? [['Threat / Attack Signature', parsedInspector.attack]] : []),
-                        ...(parsedInspector.sigId ? [['Signature ID', parsedInspector.sigId]] : []),
-                        ...(parsedInspector.attackId ? [['Attack ID', parsedInspector.attackId]] : []),
-                        ...(parsedInspector.threatFeed ? [['Detected Threat Intel Feed', parsedInspector.threatFeed]] : []),
-                        ...(parsedInspector.threatConfidence ? [['Threat Intel Confidence', `${parsedInspector.threatConfidence}%`]] : []),
-                        ['Source Network', `${parsedInspector.srcIp || '—'}${parsedInspector.srcPort ? ':' + parsedInspector.srcPort : ''}`],
-                        ['Destination Network', `${parsedInspector.dstIp || '—'}${parsedInspector.dstPort ? ':' + parsedInspector.dstPort : ''}`],
-                        ...(parsedInspector.protocol ? [['Protocol', parsedInspector.protocol]] : []),
-                        ...(parsedInspector.service ? [['Service / Application', parsedInspector.service]] : []),
-                        ...(parsedInspector.action ? [['Action Taken', parsedInspector.action.toUpperCase()]] : []),
-                        ...(parsedInspector.bytesSent || parsedInspector.bytesRcvd ? [['Traffic Volume', `Sent: ${parsedInspector.bytesSent || 0}B | Rcvd: ${parsedInspector.bytesRcvd || 0}B`]] : []),
-                        ...(parsedInspector.policyId ? [['Firewall Policy ID', parsedInspector.policyId]] : []),
-                        ...(parsedInspector.sessionId ? [['Firewall Session ID', parsedInspector.sessionId]] : []),
-                        ...(selectedAlert.mitreRef ? [['MITRE ATT&CK', selectedAlert.mitreRef]] : []),
-                        ...(selectedAlert.resolution_type ? [['Resolution Verdict', selectedAlert.resolution_type === 'true_positive' ? 'True Positive' : 'False Positive']] : []),
-                        ...(selectedAlert.notes ? [['Close Notes', selectedAlert.notes]] : []),
-                        ...parsedInspector.kvPairs,
-                      ]
-                        .filter(([k, v]) => {
-                          if (!v) return false;
-                          if (!attrSearch.trim()) return true;
-                          const q = attrSearch.toLowerCase();
-                          return k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q);
-                        })
-                        .map(([k, v], i) => (
-                          <tr key={i} className="hover:bg-slate-800/40 transition-colors">
-                            <td className="px-3.5 py-2 text-slate-400 font-sans font-medium">{k}</td>
-                            <td className="px-3.5 py-2 text-slate-200 break-all select-all">{String(v)}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* ── TAB 2: KEY-VALUE TAGS ── */}
-            {drawerTab === 'tags' && (
-              <div className="space-y-3">
-                <div className="text-xs text-slate-400">
-                  All extracted key-value attributes parsed from telemetry:
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {parsedInspector.kvPairs.map(([k, v], i) => (
-                    <div
-                      key={i}
-                      className="px-2.5 py-1 rounded-md bg-[#090d16] border border-slate-800 text-xs flex items-center gap-1.5 hover:border-slate-700 transition-colors"
-                    >
-                      <span className="text-blue-400 font-mono font-medium">{k}:</span>
-                      <span className="text-slate-200 font-mono select-all">{v}</span>
+                {/* Badges Row */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
+                  {parsedInspector.threatFeed && (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                      <Globe size={12} className="text-blue-400 shrink-0" />
+                      <span className="text-slate-400">Detected by:</span>
+                      <span className="text-white font-mono font-bold">{parsedInspector.threatFeed}</span>
                     </div>
-                  ))}
+                  )}
+
+                  {selectedAlert.mitreRef && (
+                    <span className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono">
+                      MITRE ATT&CK: {selectedAlert.mitreRef}
+                    </span>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* ── TAB 3: RAW MESSAGE ── */}
-            {drawerTab === 'raw' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>Raw Syslog / Ingest Payload</span>
-                  <button
-                    onClick={() => copyText(parsedInspector.cleanLine, setRawCopied)}
-                    className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                  >
-                    <Copy size={11} />
-                    <span>{rawCopied ? 'Copied' : 'Copy Payload'}</span>
-                  </button>
-                </div>
-                <div className="p-4 bg-[#080c16] border border-slate-800 rounded-xl font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap select-all">
-                  {parsedInspector.cleanLine}
-                </div>
+              {/* ── Workstation Tabs ── */}
+              <div className="flex items-center gap-1 p-1 bg-[#101726] rounded-xl border border-slate-800">
+                <button
+                  onClick={() => setDrawerTab('overview')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    drawerTab === 'overview' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <ShieldCheck size={13} />
+                  <span>Overview & Fields</span>
+                </button>
+                <button
+                  onClick={() => setDrawerTab('tags')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    drawerTab === 'tags' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Tag size={13} />
+                  <span>Tags ({parsedInspector.kvPairs.length})</span>
+                </button>
+                <button
+                  onClick={() => setDrawerTab('raw')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    drawerTab === 'raw' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <FileText size={13} />
+                  <span>Raw Log</span>
+                </button>
+                <button
+                  onClick={() => setDrawerTab('notes')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    drawerTab === 'notes' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Clock size={13} />
+                  <span>Timeline & Notes</span>
+                </button>
+                <button
+                  onClick={() => setDrawerTab('resolve')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    drawerTab === 'resolve' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-400/80 hover:text-emerald-300'
+                  }`}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Closure / Verdict</span>
+                </button>
               </div>
-            )}
 
-            {/* ── TAB 4: TIMELINE & NOTES ── */}
-            {drawerTab === 'notes' && (
-              <AlertInvestigationNotes
-                alertId={selectedAlert.id}
-                onNoteAdded={() => mutateAlerts()}
-              />
-            )}
+              {/* ── TAB 1: OVERVIEW & EXTRACTED FIELDS ── */}
+              {drawerTab === 'overview' && (
+                <div className="space-y-3">
+                  {/* Search in attributes */}
+                  <div className="relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={attrSearch}
+                      onChange={(e) => setAttrSearch(e.target.value)}
+                      placeholder="Search attributes (e.g. sign, ip, feed, port)..."
+                      className="w-full bg-[#0a0e18] border border-slate-700/80 rounded-lg pl-8 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                    {attrSearch && (
+                      <button onClick={() => setAttrSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Attribute Table */}
+                  <div className="bg-[#090d16] border border-slate-800 rounded-xl overflow-hidden shadow-inner">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[#0c1220] border-b border-slate-800 text-slate-400 text-[10px] uppercase font-semibold">
+                        <tr>
+                          <th className="px-4 py-2.5 w-48">Attribute</th>
+                          <th className="px-4 py-2.5">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-mono">
+                        {[
+                          ['Incident Title', selectedAlert.title],
+                          ['Severity', selectedAlert.severity?.toUpperCase()],
+                          ['Incident Status', selectedAlert.status],
+                          ['Assigned Analyst', selectedAlert.assigned_to || selectedAlert.assignedTo || 'Unassigned'],
+                          ['Timestamp', selectedAlert.timestamp],
+                          ['Source / Sensor', selectedAlert.source || 'Fortinet-FortiGate'],
+                          ['Hostname / Device', parsedInspector.hostname || 'FG-100F-HQ-CORE'],
+                          ['Event ID', String(selectedAlert.eventId || '—')],
+                          ...(parsedInspector.attack ? [['Threat / Attack Signature', parsedInspector.attack]] : []),
+                          ...(parsedInspector.sigId ? [['Signature ID', parsedInspector.sigId]] : []),
+                          ...(parsedInspector.attackId ? [['Attack ID', parsedInspector.attackId]] : []),
+                          ...(parsedInspector.threatFeed ? [['Detected Threat Intel Feed', parsedInspector.threatFeed]] : []),
+                          ...(parsedInspector.threatConfidence ? [['Threat Intel Confidence', `${parsedInspector.threatConfidence}%`]] : []),
+                          ['Source Network', `${parsedInspector.srcIp || '—'}${parsedInspector.srcPort ? ':' + parsedInspector.srcPort : ''}`],
+                          ['Destination Network', `${parsedInspector.dstIp || '—'}${parsedInspector.dstPort ? ':' + parsedInspector.dstPort : ''}`],
+                          ...(parsedInspector.protocol ? [['Protocol', parsedInspector.protocol]] : []),
+                          ...(parsedInspector.service ? [['Service / Application', parsedInspector.service]] : []),
+                          ...(parsedInspector.action ? [['Action Taken', parsedInspector.action.toUpperCase()]] : []),
+                          ...(parsedInspector.bytesSent || parsedInspector.bytesRcvd ? [['Traffic Volume', `Sent: ${parsedInspector.bytesSent || 0}B | Rcvd: ${parsedInspector.bytesRcvd || 0}B`]] : []),
+                          ...(parsedInspector.policyId ? [['Firewall Policy ID', parsedInspector.policyId]] : []),
+                          ...(parsedInspector.sessionId ? [['Firewall Session ID', parsedInspector.sessionId]] : []),
+                          ...(selectedAlert.mitreRef ? [['MITRE ATT&CK', selectedAlert.mitreRef]] : []),
+                          ...(selectedAlert.resolution_type ? [['Resolution Verdict', selectedAlert.resolution_type === 'true_positive' ? 'True Positive' : 'False Positive']] : []),
+                          ...(selectedAlert.notes ? [['Close Notes', selectedAlert.notes]] : []),
+                          ...parsedInspector.kvPairs,
+                        ]
+                          .filter(([k, v]) => {
+                            if (!v) return false;
+                            if (!attrSearch.trim()) return true;
+                            const q = attrSearch.toLowerCase();
+                            return k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q);
+                          })
+                          .map(([k, v], i) => (
+                            <tr key={i} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="px-4 py-2 text-slate-400 font-sans font-medium">{k}</td>
+                              <td className="px-4 py-2 text-slate-200 break-all select-all">{String(v)}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB 2: KEY-VALUE TAGS ── */}
+              {drawerTab === 'tags' && (
+                <div className="space-y-3">
+                  <div className="text-xs text-slate-400">
+                    All extracted key-value attributes parsed from telemetry:
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {parsedInspector.kvPairs.map(([k, v], i) => (
+                      <div
+                        key={i}
+                        className="px-3 py-1.5 rounded-lg bg-[#090d16] border border-slate-800 text-xs flex items-center gap-1.5 hover:border-slate-700 transition-colors"
+                      >
+                        <span className="text-blue-400 font-mono font-medium">{k}:</span>
+                        <span className="text-slate-200 font-mono select-all">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB 3: RAW MESSAGE ── */}
+              {drawerTab === 'raw' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Raw Syslog / Ingest Payload</span>
+                    <button
+                      onClick={() => copyText(parsedInspector.cleanLine, setRawCopied)}
+                      className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                    >
+                      <Copy size={11} />
+                      <span>{rawCopied ? 'Copied' : 'Copy Payload'}</span>
+                    </button>
+                  </div>
+                  <div className="p-4 bg-[#080c16] border border-slate-800 rounded-xl font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto whitespace-pre-wrap select-all">
+                    {parsedInspector.cleanLine}
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB 4: TIMELINE & NOTES ── */}
+              {drawerTab === 'notes' && (
+                <AlertInvestigationNotes
+                  alertId={selectedAlert.id}
+                  onNoteAdded={() => mutateAlerts()}
+                />
+              )}
+
+              {/* ── TAB 5: CLOSURE & VERDICT ── */}
+              {drawerTab === 'resolve' && (
+                <div className="space-y-4 bg-[#090e18] p-5 rounded-xl border border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-400" />
+                        <span>Incident Resolution & Closure Workflow</span>
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Classify this incident and record investigation conclusions for audit trail.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Verdict Selector */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                      Investigation Verdict
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setResolveType('true_positive')}
+                        className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                          resolveType === 'true_positive'
+                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm'
+                            : 'bg-[#0a0f1d] border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <ThumbsUp size={14} />
+                        <span>True Positive (Threat Mitigated)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setResolveType('false_positive')}
+                        className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                          resolveType === 'false_positive'
+                            ? 'bg-slate-700/60 border-slate-500 text-white shadow-sm'
+                            : 'bg-[#0a0f1d] border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <ThumbsDown size={14} />
+                        <span>False Positive (Benign / Tuning Exception)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Close Notes */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                      Remediation & Closure Notes
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={resolveNotes}
+                      onChange={(e) => setResolveNotes(e.target.value)}
+                      placeholder="Document root cause, mitigation steps taken, firewall blocking confirmation, or exception rule..."
+                      className="w-full bg-[#0a0f1d] border border-slate-700 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setDrawerTab('overview')}
+                      className="px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-colors"
+                    >
+                      Back to Overview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitResolution}
+                      disabled={isResolving}
+                      className="px-5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isResolving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                      <span>Save Verdict & Close Incident</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* ════════════════════════════════════════════════════════════ */}
-      {/* ── CLOSE / RESOLUTION MODAL ──────────────────────────────── */}
+      {/* ── STANDALONE RESOLUTION MODAL (Triggered from Table) ────── */}
       {/* ════════════════════════════════════════════════════════════ */}
       {resolvingAlert && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-[#0c1220] border border-slate-800 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-[#0c1220] border border-slate-800 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />

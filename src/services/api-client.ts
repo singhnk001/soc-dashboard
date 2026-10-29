@@ -49,12 +49,19 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     if (!response.ok) {
       let errorData: any = null;
       try {
-        errorData = await response.json();
+        const text = await response.text();
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          errorData = text;
+        }
       } catch {
-        errorData = await response.text();
+        errorData = 'Failed to read response';
       }
       const message = typeof errorData === 'object' && errorData?.detail
         ? errorData.detail
+        : typeof errorData === 'string' && errorData.trim()
+        ? errorData
         : `Request failed with status ${response.status}`;
       throw new ApiError(message, response.status, errorData);
     }

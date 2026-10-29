@@ -6,17 +6,17 @@ This document provides exact step-by-step instructions to roll back changes made
 
 ## 1. Quick Git Rollback Checkpoints
 
-### Current Checkpoint (ADR-023: Enterprise Cryptographic Session Management & OWASP/NIST Hardening)
+### Current Checkpoint (ADR-024: Alerts Investigation Popup Workstation & Ingestion Proxy Route Hardening)
 - **Commit:** Latest on `main`
 - **Features:** 
-  - Cryptographically signed session tokens (`src/lib/auth-token.ts`) using Web Crypto HMAC-SHA256 (`alg: HS256`).
-  - Server-issued `HttpOnly; SameSite=Lax; Path=/; Max-Age=1800` cookies on `/api/auth/login` and `/api/auth/login/mfa`.
-  - Next.js Edge Middleware route verification (`src/middleware.ts`) enforcing cryptographic token validity on all protected routes.
-  - Dedicated `/api/auth/me` endpoint for secure session hydration and verification.
-  - Dedicated `/api/auth/logout` endpoint for clean server-side cookie invalidation.
-  - Complete elimination of plaintext client-side `document.cookie = soc_session=...` assignments and privilege escalation vectors.
+  - Centered Modal Investigation Popup Workstation (`src/app/alerts/page.tsx`) replacing cramped right slide-over to prevent table squishing and eye strain.
+  - Next.js API proxy routes at `/api/alerts/[alertId]` and `/api/alerts/bulk` proxying to FastAPI backend on port 8002.
+  - Fixed `api-client.ts` body stream re-read error (`Failed to execute 'text' on 'Response': body stream already read`).
+  - Dynamic SIEM user assignment with optimistic state updates and database persistence.
+  - 5-tab investigation workflow (Overview & Fields, Key-Value Tags, Raw Message, Timeline & Notes, Incident Closure).
 
 ### Previous Checkpoints:
+- **ADR-023:** Enterprise Cryptographic Session Management & OWASP/NIST Hardening (HMAC-SHA256, HttpOnly cookies, Edge middleware).
 - **`f3ac383`:** Industry-Standard SOC Alerts Triage Workspace & Analyst Assignment Redesign (ADR-022).
 - **`1596762`:** Automated Threat Intelligence Alert Generation & Timestamp Cast Hardening (ADR-021).
 - **`21cc580`:** Bi-directional (Source & Destination IP) TI correlation (ADR-020).

@@ -12,7 +12,7 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 | PostgreSQL `SOC_DB` | ✅ Running | `localhost:5432`, ~262k logs |
 | FastAPI API | ✅ Running | `0.0.0.0:8002`, `--workers 1` |
 | Next.js Frontend | ✅ Running (Port 3000) | Standard responsive layout, `h-screen w-full`, 40 routes compiled |
-| Alerts Triage & Case Mgmt | 🌟 Redesigned (ADR-022) | Enterprise SOC triage workspace, dynamic SIEM analyst assignment (`/api/users`), telemetry flow preview, bulk actions, and incident inspector slide-over |
+| Alerts Triage & Case Mgmt | 🌟 Modernized (ADR-022, ADR-024) | Centered modal investigation popup workstation, dynamic SIEM analyst assignment (`/api/users`), live Next.js proxy routes, telemetry flow, and incident closure |
 | Event Inspector Slide-Over | 🌟 Modernized | High-comfort dark slate theme, Network Flow visualizer, 3-tab layout, zero glare |
 | Threat Intel Alerts | 🚨 Automated | Real-time `[TI Match]` alerts generated on any malicious IP hit (ThreatFox, AlienVault, AbuseIPDB, CISA KEV) |
 | Threat Intel & Signatures | 🛡️ Bi-Directional | Explicit `Signature ID` (`FG-IPS-39812`), `Detected Threat Intel Feed`, and `Confidence %` evaluating **BOTH Source and Destination IPs** |
@@ -42,11 +42,12 @@ Running log of system architecture, known issues, resolved bugs, and current ope
 - **Signature ID Visibility:** Displayed in both the Threat Intelligence hero card and the Attributes search table. Searching `sign` matches both `Threat / Attack Signature` and `Signature ID`.
 - **Feed Attribution:** Every flagged event clearly attributes the detecting feed along with a confidence rating.
 
-### Enterprise Alerts Triage Workspace & Analyst Case Assignment (ADR-022)
-- **High-Visibility SOC Layout:** Replaced cluttered raw log view with top metric cards, live telemetry flow previews (`Source IP:port ➔ Target IP:port` + Action badge), and a dedicated slide-over investigation inspector matching the Logs page standard.
+### Enterprise Alerts Triage Workspace & Analyst Case Assignment (ADR-022, ADR-024)
+- **Modal Investigation Popup Workstation:** Replaced the right slide-over with a centered **Investigation Popup Window (Modal Workstation)** (`max-w-5xl max-h-[92vh]`) with backdrop blur. When an analyst clicks any alert, the workstation opens over the center of the screen with zero squishing or horizontal displacement of the underlying table.
 - **Dynamic SIEM Analyst Assignment:** Replaced hardcoded dummy strings (`L1 Analyst`, `L2 Analyst`) with live user accounts fetched from `/api/users`. Analysts can assign incidents to active team members (`Administrator`, `Aditya`, `Manish Raj`, `Neha Prasad`, `Prince K`, `Vishal B`), click **"Assign to Me"** for 1-click ownership, or use the table row **"+ Assign Analyst"** dropdown for rapid queue processing.
-- **Bulk Triage Toolbar:** Multi-select checkboxes allow analysts to batch-assign multiple alerts to any analyst or batch-resolve incidents with a single click.
-- **Incident Inspector Slide-Over:** Features telemetry flow visualizer, threat intelligence correlation banner (with Attack Signature, Signature ID, Feed attribution, and Confidence %), and 4 tabs (Overview & Fields with real-time search, Key-Value Tags, Raw Log, and Investigation Timeline & Notes).
+- **Next.js API Proxy Routes:** Handlers at `/api/alerts/[alertId]` and `/api/alerts/bulk` proxy client PATCH/POST requests directly to FastAPI (`http://127.0.0.1:8002`), ensuring live database persistence for assignment and closure.
+- **5 Workstation Tabs:** Features Overview & Fields (with real-time key/value search filter), Key-Value Tags, Raw Message (cleanly unescaped JSON), Investigation Timeline & Notes, and Incident Closure & Verdict (True/False Positive with close notes).
+- **Stream Re-Read Fix (`api-client.ts`):** Cached raw response text before attempting JSON parsing, completely resolving `Failed to execute 'text' on 'Response': body stream already read`.
 
 ### Event Inspector & UX Ergonomics
 - **No Table Squishing:** Event slide-over uses standard fixed overlay (`w-[640px] max-w-[95vw]` with `bg-black/60 backdrop-blur-[2px]`). Main table width does not contract or shift horizontally.

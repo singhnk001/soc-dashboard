@@ -219,3 +219,26 @@
 - Reading cookies via JavaScript disabled `HttpOnly`, leaving sessions vulnerable to XSS exfiltration.
 **Impact:**
 - Full enterprise SOC compliance: zero client-side privilege tampering, protection against XSS session hijacking, automatic session expiration after 30 minutes, and complete server-side session authority.
+
+
+## ADR-024: Alerts Investigation Popup Workstation & Ingestion Proxy Route Hardening
+**Decision:**
+1. **Resolved `Failed to execute 'text' on 'Response': body stream already read` Bug (`src/services/api-client.ts`)**:
+   - `api-client.ts` previously called `await response.json()` in a `try` block, and on failure attempted `await response.text()` on the same already-consumed Response stream, crashing Next.js client requests with `Failed to execute 'text' on 'Response': body stream already read`.
+   - Refactored `api-client.ts` to consume `await response.text()` once into a local string variable, then safely attempt `JSON.parse(rawText)` with fallback to the string, preventing duplicate stream read errors.
+2. **Next.js API Proxy Route Hardening (`src/app/api/alerts/`)**:
+   - Created `src/app/api/alerts/[alertId]/route.ts` with `GET` and `PATCH` handlers forwarding requests to FastAPI `http://127.0.0.1:8002/api/alerts/{alert_id}`.
+   - Created `src/app/api/alerts/bulk/route.ts` with `POST` handler forwarding bulk update requests to FastAPI `http://127.0.0.1:8002/api/alerts/bulk`.
+   - Upgraded `src/app/api/alerts/[alertId]/comments/route.ts` with live forwarding for comments.
+   - Resolved the issue where alert assignments and status transitions from the frontend returned 404 because client components hit port 3000 directly instead of FastAPI on port 8002.
+3. **Modal Investigation Popup Workstation (`src/app/alerts/page.tsx`)**:
+   - Replaced the cramped right slide-over panel with a dedicated, centered **Investigation Popup Window (Modal Workstation)** (`fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5`) with a `max-w-5xl max-h-[92vh] bg-[#0c1220]` card.
+   - The main alerts table remains 100% full width and completely unsquished.
+   - Fixed text truncation on buttons (full "Assign to Me" label visible).
+   - Added optimistic UI state updates in `handleUpdateAlert` so assignee and status update instantly in the UI.
+   - Added 5 Workstation Tabs: Overview & Fields (searchable), Key-Value Tags, Raw Message, Timeline & Notes, and Closure / Verdict (True/False positive resolution with close notes).
+**Reason:**
+- The previous right-side drawer squished the alerts table horizontally, truncating text and creating eye strain for SOC analysts.
+- Missing proxy routes caused alert updates to 404, and the body stream re-read bug threw unhandled exceptions during failure logging.
+**Impact:**
+- Seamless alert assignment to active SIEM analysts, zero API errors, instant UI updates, and an ergonomic centered modal investigation window matching top-tier enterprise SOC platforms.
